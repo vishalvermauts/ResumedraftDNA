@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/resumedraft
+      - REDIS_URL=redis://redis:6379
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  worker:
+    build: .
+    command: celery -A app.worker worker --loglevel=info
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+  beat:
+    build: .
+    command: celery -A app.worker beat --loglevel=info
+    depends_on:
+      - redis
+    volumes:
+      - .:/app

@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic-settings
+firebase-admin
+motor
+pymongo
+celery
+redis
+google-genai
+httpx
+pytest
+pymupdf
+python-dotenv
