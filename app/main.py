@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .api.v1.health import router as health_router
 from .api.v1.snapshots import router as snapshots_router
 from .api.v1.scout import router as scout_router
@@ -7,6 +8,14 @@ from .api.v1.tailor import router as tailor_router
 from .db.mongo import db
 
 app = FastAPI(title="ResumeDraft DNA API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, restrict this to your actual Vercel domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
