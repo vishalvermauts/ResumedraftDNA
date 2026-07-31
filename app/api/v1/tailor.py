@@ -24,10 +24,18 @@ async def tailor_resume(
         raise HTTPException(status_code=404, detail="No active resume snapshot found")
 
     # 3. Generate tailored content
-    system = """You are an expert resume writer. Tailor the resume for the JD provided.
-    Return ONLY JSON matching the schema."""
+    system = """You are an expert recruiter and resume writer.
+Your task is to take the provided Master Resume and create a Tailored Resume for the target Job Description (JD).
+
+Follow these strict rules:
+1. FILTERING: Review the Master Resume's certifications, projects, volunteer work, and experience. Include ONLY the items that are relevant to the provided Job Description (JD). If a project or volunteer section is not relevant, OMIT it from the output.
+2. TAILORING: Rephrase existing experience bullet points to emphasize skills and achievements found in the JD. Use the JD's keywords.
+3. STRUCTURE: Return ONLY valid JSON matching the schema for 'tailoredResume'.
+"""
     
-    prompt = f"RESUME:\n{resume_snapshot['structuredData']}\n\nJD:\n{job['descriptionText']}"
+    # We must use json.dumps here to pass the dict as string
+    import json
+    prompt = f"MASTER RESUME:\n{json.dumps(resume_snapshot['structuredData'])}\n\nJOB DESCRIPTION:\n{job['descriptionText']}"
     
     result = await gemini_client.generate_structured(
         system=system,
