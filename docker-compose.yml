@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
@@ -24,6 +26,8 @@ services:
       - redis
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
@@ -34,6 +38,8 @@ services:
       - redis
     volumes:
       - .:/app
+    env_file:
+      - .env
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
