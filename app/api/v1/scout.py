@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from ...connectors.greenhouse import GreenhouseConnector
 from ...connectors.lever import LeverConnector
 from ...worker import ingest_jobs_task
@@ -8,7 +8,7 @@ from ...db.mongo import db
 router = APIRouter()
 
 @router.post("/scout")
-async def trigger_scout(source: str, token: str, background_tasks: BackgroundTasks):
+async def trigger_scout(source: str, token: str, user: dict = Depends(get_current_user)):
     if source == "greenhouse":
         connector = GreenhouseConnector(token)
     elif source == "lever":
