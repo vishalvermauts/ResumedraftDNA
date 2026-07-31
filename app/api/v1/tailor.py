@@ -29,29 +29,31 @@ Your task is to take the provided Master Resume and create a Tailored Resume for
 Follow these strict rules:
 1. FILTERING: Review the Master Resume's certifications, projects, volunteer work, and experience. Include ONLY the items that are relevant to the provided Job Description (JD). If a project or volunteer section is not relevant, OMIT it from the output.
 2. TAILORING: Rephrase existing experience bullet points to emphasize skills and achievements found in the JD. Use the JD's keywords.
-3. STRUCTURE: Return ONLY valid JSON matching the schema for 'tailoredResume'."""
-    
+3. STRUCTURE: Return ONLY valid JSON. The 'tailoredResume' field must be a JSON-encoded STRING containing an object with the exact same shape as the Master Resume."""
+
     import json
     prompt = f"MASTER RESUME:\n{json.dumps(resume_snapshot['structuredData'])}\n\nJOB DESCRIPTION:\n{req.description}"
-    
+
     try:
         result = await gemini_client.generate_structured(
             system=system,
             user=prompt,
             schema=TailoredArtifact
         )
+        tailored_resume = json.loads(result.tailoredResume)
     except Exception as e:
         print(f"Gemini generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
-    
+
     # 4. Save artifact
+    content = {"tailoredResume": tailored_resume, "coverLetter": result.coverLetter}
     artifact_doc = {
         "uid": user["uid"],
         "jobId": ObjectId(job_id),
         "type": "tailored_resume",
-        "content": result.model_dump(),
+        "content": content,
         "createdAt": datetime.utcnow()
     }
     await db.db.artifacts.insert_one(artifact_doc)
-    
-    return {"status": "success", "data": result.model_dump()}
+
+    return {"status": "success", "data": content}

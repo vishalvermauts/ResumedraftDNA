@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Optional
 
 class TailoredArtifact(BaseModel):
-    tailoredResume: Dict[str, Any]
+    tailoredResume: str  # JSON-encoded string mirroring the master resume's structuredData shape
     coverLetter: Optional[str] = None
