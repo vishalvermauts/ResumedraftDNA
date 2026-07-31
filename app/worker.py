@@ -1,9 +1,17 @@
 import os
+import json
 from celery import Celery
 from .db.mongo import db
 from .connectors.registry import get_connector
+from .ai.gemini import gemini_client
+from .ai.quota import grounding_quota_available, record_grounding_usage
 import asyncio
-from datetime import timedelta
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import timedelta, datetime, timezone
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(credentials.Certificate("serviceAccountKey.json"))
 
 celery_app = Celery(
     "worker",
@@ -14,6 +22,10 @@ celery_app = Celery(
 celery_app.conf.beat_schedule = {
     'discover-jobs-every-hour': {
         'task': 'app.worker.discover_jobs_task',
+        'schedule': timedelta(hours=1),
+    },
+    'personalized-discovery-every-hour': {
+        'task': 'app.worker.personalized_discovery_task',
         'schedule': timedelta(hours=1),
     },
 }
@@ -73,3 +85,95 @@ def discover_jobs_task():
             ingest_jobs_task.delay(jobs_dict)
 
     return "Discovery task completed"
+
+def _parse_grounded_json(text):
+    cleaned = (text or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:]
+    try:
+        data = json.loads(cleaned)
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, ValueError):
+        return []
+
+@celery_app.task
+def personalized_discovery_task():
+    """Per-user role/location job search via Gemini + Search grounding. Respects each user's
+    configured frequency and the shared free-tier grounding quota. Writes matches directly to
+    the user's Firestore `jobs` collection (source: 'automation') so they show up immediately."""
+    loop = asyncio.get_event_loop()
+    if db.db is None:
+        loop.run_until_complete(db.connect())
+
+    now = datetime.now(timezone.utc)
+    settings_list = loop.run_until_complete(
+        db.db.automation_settings.find({"enabled": True}).to_list(length=200)
+    )
+
+    fs = firestore.client()
+
+    for s in settings_list:
+        titles = s.get("jobTitles") or []
+        if not titles:
+            continue
+
+        last_run = s.get("lastRunAt")
+        freq_hours = s.get("frequencyHours", 24)
+        if last_run:
+            last_run_utc = last_run if last_run.tzinfo else last_run.replace(tzinfo=timezone.utc)
+            if now - last_run_utc < timedelta(hours=freq_hours):
+                continue
+
+        if not loop.run_until_complete(grounding_quota_available()):
+            print("Automation: grounding quota exhausted this month, skipping remaining users")
+            break
+
+        uid = s["uid"]
+        locations = s.get("locations") or ["Remote"]
+        remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
+        prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
+{remote_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
+Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
+
+        try:
+            text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
+            loop.run_until_complete(record_grounding_usage())
+        except Exception as e:
+            print(f"Automation search failed for {uid}: {e}")
+            continue
+
+        listings = _parse_grounded_json(text)
+
+        existing_urls = {
+            d.to_dict().get("url")
+            for d in fs.collection("jobs").where("uid", "==", uid).where("source", "==", "automation").stream()
+        }
+
+        for item in listings:
+            if not isinstance(item, dict):
+                continue
+            apply_url = item.get("applyUrl")
+            title = item.get("title")
+            if not apply_url or not title or apply_url in existing_urls:
+                continue
+            fs.collection("jobs").add({
+                "uid": uid,
+                "title": title,
+                "company": item.get("company", ""),
+                "location": item.get("location", ""),
+                "description": item.get("description", ""),
+                "url": apply_url,
+                "source": "automation",
+                "status": "saved",
+                "bookmarked": False,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            })
+
+        loop.run_until_complete(
+            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+        )
+
+    return "Personalized discovery completed"
