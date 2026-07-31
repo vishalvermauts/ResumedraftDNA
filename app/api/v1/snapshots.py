@@ -13,7 +13,13 @@ async def create_resume_snapshot(
     snapshot: ResumeSnapshot,
     user: dict = Depends(get_current_user)
 ):
-    # Create content hash to avoid duplicate storage
+    # 1. Unset all existing active snapshots
+    await db.db.resume_snapshots.update_many(
+        {"uid": user["uid"], "active": True},
+        {"$set": {"active": False}}
+    )
+
+    # 2. Create content hash
     content_str = json.dumps(snapshot.structuredData, sort_keys=True)
     content_hash = hashlib.sha256(content_str.encode()).hexdigest()
     
@@ -27,10 +33,7 @@ async def create_resume_snapshot(
         "createdAt": datetime.utcnow()
     }
     
-    # In a real app, you'd check if this version already exists
-    # For now, we insert.
     result = await db.db.resume_snapshots.insert_one(snapshot_doc)
-    
     return {"status": "success", "id": str(result.inserted_id)}
 
 @router.post("/resume-snapshots/set-master")
