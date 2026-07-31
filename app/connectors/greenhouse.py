@@ -3,9 +3,9 @@ from .base import BaseConnector, canonical_hash
 from ..schemas.job import JobPosting, Location
 
 class GreenhouseConnector(BaseConnector):
-    def __init__(self, board_token: str):
-        super().__init__(board_token)
-        self.base_url = f"https://boards-api.greenhouse.io/v1/boards/{board_token}/jobs"
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.base_url = f"https://boards-api.greenhouse.io/v1/boards/{self.board_token}/jobs"
 
     async def fetch_jobs(self):
         async with httpx.AsyncClient() as client:

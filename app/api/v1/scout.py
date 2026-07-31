@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from ...connectors.greenhouse import GreenhouseConnector
-from ...connectors.lever import LeverConnector
+from ...connectors.registry import get_connector
 from ...worker import ingest_jobs_task
 from ...auth import get_current_user
 from ...db.mongo import db
@@ -9,13 +8,10 @@ router = APIRouter()
 
 @router.post("/scout")
 async def trigger_scout(source: str, token: str, user: dict = Depends(get_current_user)):
-    if source == "greenhouse":
-        connector = GreenhouseConnector(token)
-    elif source == "lever":
-        connector = LeverConnector(token)
-    else:
+    connector = get_connector(source, {"boardToken": token, "companyName": token, "careersUrl": None})
+    if not connector:
         raise HTTPException(status_code=400, detail="Unsupported source")
-    
+
     try:
         jobs = await connector.fetch_jobs()
         # Convert jobs to dict for Celery

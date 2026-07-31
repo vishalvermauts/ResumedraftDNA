@@ -20,4 +20,16 @@ class GeminiClient:
         )
         return schema.model_validate_json(response.text)
 
+    async def generate_grounded(self, prompt: str) -> str:
+        """Gemini + Google Search grounding. Billed per search query beyond the free monthly
+        quota -- callers must gate this behind their own quota check (see connectors/ai_search.py)."""
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
+        )
+        return response.text
+
 gemini_client = GeminiClient()

@@ -3,9 +3,9 @@ from .base import BaseConnector, canonical_hash
 from ..schemas.job import JobPosting, Location
 
 class LeverConnector(BaseConnector):
-    def __init__(self, company_name: str):
-        super().__init__(company_name)
-        self.base_url = f"https://api.lever.co/v0/postings/{company_name}?mode=json"
+    def __init__(self, config: dict):
+        super().__init__(config)
+        self.base_url = f"https://api.lever.co/v0/postings/{self.board_token}?mode=json"
 
     async def fetch_jobs(self):
         async with httpx.AsyncClient() as client:

@@ -25,8 +25,12 @@ def canonical_hash(
     return hashlib.sha256(raw.encode()).hexdigest()
 
 class BaseConnector:
-    def __init__(self, board_token: str):
-        self.board_token = board_token
-    
+    """config: {"boardToken": str|None, "companyName": str|None, "careersUrl": str|None}"""
+    def __init__(self, config: dict):
+        self.config = config or {}
+        self.board_token = self.config.get("boardToken")
+        self.company_name = self.config.get("companyName")
+        self.careers_url = self.config.get("careersUrl")
+
     async def fetch_jobs(self):
         raise NotImplementedError("fetch_jobs must be implemented")
