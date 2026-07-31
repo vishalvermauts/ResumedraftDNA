@@ -3,7 +3,6 @@ from ...auth import get_current_user
 from ...db.mongo import db
 from ...ai.gemini import gemini_client
 from ...schemas.artifact import TailoredArtifact
-from bson import ObjectId
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -49,7 +48,7 @@ Follow these strict rules:
     content = {"tailoredResume": tailored_resume, "coverLetter": result.coverLetter}
     artifact_doc = {
         "uid": user["uid"],
-        "jobId": ObjectId(job_id),
+        "jobId": job_id,
         "type": "tailored_resume",
         "content": content,
         "createdAt": datetime.utcnow()
