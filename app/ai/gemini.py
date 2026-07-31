@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class GeminiClient:
     def __init__(self):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
     async def generate_structured(self, system: str, user: str, schema: type[BaseModel]) -> BaseModel:
         response = await self.client.aio.models.generate_content(
