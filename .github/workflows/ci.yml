@@ -65,10 +65,13 @@ jobs:
           EC2_HOST: 98.80.105.34
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          # Strip CRLF defensively -- the secret may have been set from a Windows machine
+          # (Get-Content -Raw preserves \r\n), and OpenSSH rejects a PEM key with CRLF
+          # line endings as malformed.
+          printf '%s' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/deploy_key ubuntu@"$EC2_HOST" \
+          ssh -v -i ~/.ssh/deploy_key ubuntu@"$EC2_HOST" \
             "cd ~/app && git pull origin master && sudo docker compose up -d --build api worker beat"
 
       - name: Post-deploy health check
