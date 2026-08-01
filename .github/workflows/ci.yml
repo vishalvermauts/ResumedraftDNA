@@ -44,3 +44,44 @@ jobs:
       # this only catches it at push/PR time.
       - name: Run tests
         run: python -m pytest tests/ -v
+
+  # Deploys to the existing EC2/Docker Compose box via SSH -- the same commands run manually
+  # all session (git pull && docker compose up -d --build). Every backend deploy before this
+  # was manual with no pre-deploy check, which is how the deprecated-model bug, the missing
+  # serviceAccountKey.json, and the undeployed Firestore rules incidents all happened. This
+  # doesn't fix the "manual step forgotten" class of problem in general (see Roadmap.md's
+  # release-gate plan, item D, for why SSH+EC2 itself isn't being replaced this pass -- GitHub
+  # OIDC + AWS SSM SendCommand, no long-lived key, no inbound SSH, is the recommended next
+  # step, not built here), but it does mean *this* deploy can no longer happen with failing
+  # tests or without a working health check afterward.
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: 98.80.105.34
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/deploy_key ubuntu@"$EC2_HOST" \
+            "cd ~/app && git pull origin master && sudo docker compose up -d --build api worker beat"
+
+      - name: Post-deploy health check
+        env:
+          EC2_HOST: 98.80.105.34
+        run: |
+          for attempt in $(seq 1 10); do
+            if curl -sf "http://$EC2_HOST:8000/v1/health" > /dev/null; then
+              echo "Health check passed on attempt $attempt"
+              exit 0
+            fi
+            echo "Health check attempt $attempt failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::Deploy succeeded but health check never passed -- investigate the api container immediately"
+          exit 1
