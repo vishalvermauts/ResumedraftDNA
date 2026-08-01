@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+serviceAccountKey.json
+.env
+.env.test.local

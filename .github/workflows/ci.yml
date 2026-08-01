@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand(\"ping\")' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MONGODB_URI: mongodb://localhost:27017/resumedraft_test
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Restore Firebase service account key
+        run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}" | base64 -d > serviceAccountKey.json
+
+      # Includes the Gemini model-liveness checks (real API calls, deterministic pass/fail --
+      # this is the specific test that would have caught this session's deprecated-model
+      # incident before deploy, per the release-gate plan's B.2). A scheduled nightly/prod
+      # canary is a separate follow-up for catching a model retired *after* the last push;
+      # this only catches it at push/PR time.
+      - name: Run tests
+        run: python -m pytest tests/ -v
