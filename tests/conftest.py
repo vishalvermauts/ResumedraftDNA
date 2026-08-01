@@ -2,11 +2,6 @@ import os
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-# Explicitly register anyio's pytest plugin rather than relying on auto-discovery -- this
-# worked locally without it (apparently picked up implicitly) but failed in a clean CI
-# environment with "requested an async fixture ... with no plugin or hook that handled it".
-pytest_plugins = ["anyio"]
-
 os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27018/resumedraft_test")
 
 from app.main import app
@@ -18,11 +13,6 @@ FAKE_UID = "test-uid-12345"
 
 def fake_user():
     return {"uid": FAKE_UID, "email": "test@example.com"}
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
 
 
 @pytest.fixture(autouse=True)

@@ -9,5 +9,6 @@ redis
 google-genai
 httpx
 pytest
+pytest-asyncio
 pymupdf
 python-dotenv

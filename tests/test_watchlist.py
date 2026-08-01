@@ -6,7 +6,6 @@ from app.auth import get_current_user
 OTHER_UID = "other-user-uid"
 
 
-@pytest.mark.anyio
 async def test_create_and_list_watchlist_entry(client):
     payload = {
         "companyName": "Acme",
@@ -24,7 +23,6 @@ async def test_create_and_list_watchlist_entry(client):
     assert item_id in ids
 
 
-@pytest.mark.anyio
 async def test_owner_can_delete_own_entry(client):
     payload = {
         "companyName": "Acme",
@@ -41,7 +39,6 @@ async def test_owner_can_delete_own_entry(client):
     assert item_id not in [item["id"] for item in listed.json()]
 
 
-@pytest.mark.anyio
 async def test_cannot_delete_another_users_entry(client):
     payload = {
         "companyName": "Acme",
@@ -61,14 +58,12 @@ async def test_cannot_delete_another_users_entry(client):
         await db.db.company_watchlists.delete_one({"_id": ObjectId(item_id)})
 
 
-@pytest.mark.anyio
 async def test_deleting_nonexistent_entry_returns_404(client):
     fake_id = str(ObjectId())
     resp = await client.delete(f"/v1/watchlist/{fake_id}")
     assert resp.status_code == 404
 
 
-@pytest.mark.anyio
 async def test_watchlist_requires_auth(client):
     app.dependency_overrides.pop(get_current_user, None)
     resp = await client.get("/v1/watchlist")

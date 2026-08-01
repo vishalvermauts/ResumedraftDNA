@@ -9,14 +9,12 @@ import pytest
 from unittest.mock import AsyncMock, patch
 
 
-@pytest.mark.anyio
 async def test_tailor_without_active_snapshot_returns_404(client):
     resp = await client.post("/v1/tailor/someJobId123?type=resume", json={"description": "A job description"})
     assert resp.status_code == 404
     assert "snapshot" in resp.json()["detail"].lower()
 
 
-@pytest.mark.anyio
 async def test_tailor_resume_generates_and_saves_artifact(client):
     from app.db.mongo import db
     from app.schemas.artifact import TailoredArtifact
@@ -41,7 +39,6 @@ async def test_tailor_resume_generates_and_saves_artifact(client):
     assert body["data"]["coverLetter"] is None
 
 
-@pytest.mark.anyio
 async def test_tailor_cover_letter_type_is_sent_to_the_model(client):
     """Regression guard: the endpoint used to ignore ?type= entirely and always generate a
     resume-shaped response, even when the frontend asked for a cover letter."""
@@ -71,7 +68,6 @@ async def test_tailor_cover_letter_type_is_sent_to_the_model(client):
     assert "coverLetter" in captured["system"] or "cover letter" in captured["system"].lower()
 
 
-@pytest.mark.anyio
 async def test_tailor_requires_auth(client):
     from app.main import app
     from app.auth import get_current_user
