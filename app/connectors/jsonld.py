@@ -1,7 +1,7 @@
 import httpx
 import json
 import re
-from .base import BaseConnector, canonical_hash
+from .base import BaseConnector, canonical_hash, html_to_text
 from ..schemas.job import JobPosting, Location
 
 LD_JSON_RE = re.compile(
@@ -41,7 +41,7 @@ class JsonLdConnector(BaseConnector):
 
                 title = entry.get("title", "")
                 apply_url = entry.get("url") or self.careers_url
-                description = entry.get("description", "") or ""
+                description = html_to_text(entry.get("description", "") or "")
 
                 job_location = entry.get("jobLocation", {})
                 if isinstance(job_location, list):

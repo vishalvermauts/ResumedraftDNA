@@ -1,5 +1,24 @@
 import hashlib
+import re
+import html as html_lib
 from typing import Optional
+
+_BLOCK_TAG_RE = re.compile(r'</(p|div|li|h[1-6])\s*>|<br\s*/?>', re.IGNORECASE)
+_TAG_RE = re.compile(r'<[^>]+>')
+_WHITESPACE_RE = re.compile(r'\n{3,}')
+
+
+def html_to_text(raw_html: str) -> str:
+    """Converts a raw HTML job description (e.g. Greenhouse's `content` field) into readable
+    plain text -- block-level tags become line breaks, everything else is stripped, entities
+    are decoded. Good enough for display; not a full HTML renderer."""
+    if not raw_html:
+        return ""
+    text = _BLOCK_TAG_RE.sub('\n', raw_html)
+    text = _TAG_RE.sub('', text)
+    text = html_lib.unescape(text)
+    text = _WHITESPACE_RE.sub('\n\n', text)
+    return text.strip()
 
 def canonical_hash(
     source: str, 

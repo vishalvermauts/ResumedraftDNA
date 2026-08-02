@@ -1,5 +1,5 @@
 import httpx
-from .base import BaseConnector, canonical_hash
+from .base import BaseConnector, canonical_hash, html_to_text
 from ..schemas.job import JobPosting, Location
 
 class GreenhouseConnector(BaseConnector):
@@ -31,7 +31,7 @@ class GreenhouseConnector(BaseConnector):
                     companyName=self.board_token,
                     title=job.get('title'),
                     location=[Location(raw=loc_raw)],
-                    descriptionText=job.get('content', ''),
+                    descriptionText=html_to_text(job.get('content', '')),
                     applyUrl=job.get('absolute_url'),
                     canonicalUrl=job.get('absolute_url')
                 ))
