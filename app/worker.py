@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from celery import Celery
 from .db.mongo import db
@@ -9,6 +10,42 @@ import asyncio
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import timedelta, datetime, timezone
+
+_GREENHOUSE_URL_RE = re.compile(r'(?:boards|job-boards)\.greenhouse\.io/([^/]+)/jobs/(\d+)')
+_LEVER_URL_RE = re.compile(r'jobs\.lever\.co/([^/]+)/([a-f0-9-]{20,})')
+
+
+def _upgrade_via_known_ats(apply_url, loop):
+    """Gemini's web search can find a candidate posting anywhere, but it only ever writes
+    back a short AI-written summary. If the URL it found happens to belong to a company on
+    Greenhouse or Lever, fetch that company's real board and swap in the actual structured
+    job (real description, verified apply link, correct source tag) instead of trusting the
+    AI's guess. Returns a JobPosting or None if the URL isn't a recognized ATS, the board
+    fetch fails, or the specific job can't be matched."""
+    if not apply_url:
+        return None
+
+    m = _GREENHOUSE_URL_RE.search(apply_url)
+    if m:
+        token, job_id = m.group(1), m.group(2)
+        connector = get_connector("greenhouse", {"boardToken": token})
+        try:
+            jobs = loop.run_until_complete(connector.fetch_jobs())
+        except Exception:
+            return None
+        return next((j for j in jobs if j.sourceJobId == job_id), None)
+
+    m = _LEVER_URL_RE.search(apply_url)
+    if m:
+        token = m.group(1)
+        connector = get_connector("lever", {"boardToken": token})
+        try:
+            jobs = loop.run_until_complete(connector.fetch_jobs())
+        except Exception:
+            return None
+        return next((j for j in jobs if j.applyUrl == apply_url), None)
+
+    return None
 
 if not firebase_admin._apps:
     firebase_admin.initialize_app(credentials.Certificate("serviceAccountKey.json"))
@@ -107,8 +144,10 @@ def personalized_discovery_task():
     user's configured frequency and the shared free-tier grounding quota. Writes matches
     directly to the user's Firestore `jobs` collection (foundVia: 'automation'; `source`
     keeps its true origin -- 'greenhouse'/'lever'/'jsonld'/'ai_search' -- so the existing
-    per-source quality badge in the UI stays accurate regardless of how a job was added)."""
-    import re
+    per-source quality badge in the UI stays accurate regardless of how a job was added).
+    Gemini's own web-wide results additionally get checked against Greenhouse/Lever: if the
+    URL it found belongs to a company on one of those, the real structured job is fetched and
+    swapped in for the AI's summary."""
     loop = asyncio.get_event_loop()
     if db.db is None:
         loop.run_until_complete(db.connect())
@@ -195,6 +234,26 @@ Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "de
             title = item.get("title")
             if not apply_url or not title or apply_url in existing_urls:
                 continue
+
+            upgraded = _upgrade_via_known_ats(apply_url, loop)
+            if upgraded:
+                fs.collection("jobs").add({
+                    "uid": uid,
+                    "title": upgraded.title,
+                    "company": upgraded.companyName,
+                    "location": upgraded.location[0].raw if upgraded.location else "",
+                    "description": upgraded.descriptionText,
+                    "url": upgraded.applyUrl,
+                    "source": upgraded.source,
+                    "foundVia": "automation",
+                    "status": "saved",
+                    "bookmarked": False,
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                })
+                existing_urls.add(upgraded.applyUrl)
+                continue
+
             fs.collection("jobs").add({
                 "uid": uid,
                 "title": title,
