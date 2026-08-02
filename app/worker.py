@@ -100,9 +100,15 @@ def _parse_grounded_json(text):
 
 @celery_app.task
 def personalized_discovery_task():
-    """Per-user role/location job search via Gemini + Search grounding. Respects each user's
-    configured frequency and the shared free-tier grounding quota. Writes matches directly to
-    the user's Firestore `jobs` collection (source: 'automation') so they show up immediately."""
+    """Per-user role/location job search. Checks two sources: (1) the shared job_postings
+    corpus that Watchlist's discover_jobs_task builds from real Greenhouse/Lever/JSON-LD
+    scrapes, matched by title/location -- real, structured data; (2) Gemini + Search
+    grounding as a web-wide fallback for roles no watched company has open. Respects each
+    user's configured frequency and the shared free-tier grounding quota. Writes matches
+    directly to the user's Firestore `jobs` collection (foundVia: 'automation'; `source`
+    keeps its true origin -- 'greenhouse'/'lever'/'jsonld'/'ai_search' -- so the existing
+    per-source quality badge in the UI stays accurate regardless of how a job was added)."""
+    import re
     loop = asyncio.get_event_loop()
     if db.db is None:
         loop.run_until_complete(db.connect())
@@ -126,12 +132,45 @@ def personalized_discovery_task():
             if now - last_run_utc < timedelta(hours=freq_hours):
                 continue
 
-        if not loop.run_until_complete(grounding_quota_available()):
-            print("Automation: grounding quota exhausted this month, skipping remaining users")
-            break
-
         uid = s["uid"]
         locations = s.get("locations") or ["Remote"]
+
+        existing_urls = {
+            d.to_dict().get("url")
+            for d in fs.collection("jobs").where("uid", "==", uid).stream()
+        }
+
+        # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
+        title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
+        corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
+        for job in corpus_matches:
+            apply_url = job.get("applyUrl") or job.get("canonicalUrl")
+            if not apply_url or apply_url in existing_urls:
+                continue
+            fs.collection("jobs").add({
+                "uid": uid,
+                "title": job.get("title", ""),
+                "company": job.get("companyName", ""),
+                "location": (job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
+                "description": job.get("descriptionText", ""),
+                "url": apply_url,
+                "source": job.get("source", "unknown"),
+                "foundVia": "automation",
+                "status": "saved",
+                "bookmarked": False,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            })
+            existing_urls.add(apply_url)
+
+        # 2) Web-wide fallback via Gemini + Search grounding, quota-guarded.
+        if not loop.run_until_complete(grounding_quota_available()):
+            print("Automation: grounding quota exhausted this month, skipping AI search fallback")
+            loop.run_until_complete(
+                db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+            )
+            continue
+
         remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
         prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
 {remote_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
@@ -142,14 +181,12 @@ Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "de
             loop.run_until_complete(record_grounding_usage())
         except Exception as e:
             print(f"Automation search failed for {uid}: {e}")
+            loop.run_until_complete(
+                db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+            )
             continue
 
         listings = _parse_grounded_json(text)
-
-        existing_urls = {
-            d.to_dict().get("url")
-            for d in fs.collection("jobs").where("uid", "==", uid).where("source", "==", "automation").stream()
-        }
 
         for item in listings:
             if not isinstance(item, dict):
@@ -165,12 +202,14 @@ Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "de
                 "location": item.get("location", ""),
                 "description": item.get("description", ""),
                 "url": apply_url,
-                "source": "automation",
+                "source": "ai_search",
+                "foundVia": "automation",
                 "status": "saved",
                 "bookmarked": False,
                 "createdAt": firestore.SERVER_TIMESTAMP,
                 "updatedAt": firestore.SERVER_TIMESTAMP,
             })
+            existing_urls.add(apply_url)
 
         loop.run_until_complete(
             db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
