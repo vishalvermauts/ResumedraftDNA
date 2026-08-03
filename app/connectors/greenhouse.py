@@ -1,5 +1,5 @@
 import httpx
-from .base import BaseConnector, canonical_hash, html_to_text
+from .base import BaseConnector, canonical_hash, html_to_text, default_headers
 from ..schemas.job import JobPosting, Location
 
 class GreenhouseConnector(BaseConnector):
@@ -8,7 +8,7 @@ class GreenhouseConnector(BaseConnector):
         self.base_url = f"https://boards-api.greenhouse.io/v1/boards/{self.board_token}/jobs"
 
     async def fetch_jobs(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(headers=default_headers()) as client:
             response = await client.get(f"{self.base_url}?content=true", timeout=10.0)
             response.raise_for_status()
             data = response.json()

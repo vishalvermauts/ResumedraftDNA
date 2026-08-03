@@ -1,9 +1,18 @@
 import os
 import re
 import json
+import random
+import inspect
 from celery import Celery
 from .db.mongo import db
 from .connectors.registry import get_connector
+from .connectors.base import (
+    SUCCESS_WITH_JOBS,
+    SUCCESS_EMPTY,
+    NOT_SUPPORTED_OR_UNAVAILABLE,
+    ERROR,
+    ConnectorBackoffError,
+)
 from .ai.gemini import gemini_client
 from .ai.quota import grounding_quota_available, record_grounding_usage
 import asyncio
@@ -14,6 +23,38 @@ from bson import ObjectId
 
 _GREENHOUSE_URL_RE = re.compile(r'(?:boards|job-boards)\.greenhouse\.io/([^/]+)/jobs/(\d+)')
 _LEVER_URL_RE = re.compile(r'jobs\.lever\.co/([^/]+)/([a-f0-9-]{20,})')
+
+# A provider that has been failing is demoted back to the full fallback chain once a
+# resolvedConnectorType crosses this many consecutive failed runs.
+RESOLUTION_FAILURE_THRESHOLD = 3
+
+# Max seconds of random jitter added before each company's fetch within a run, so the
+# top-of-hour run spreads its provider requests over a ramp instead of a tight burst.
+JITTER_MAX_SECONDS = float(os.getenv("DISCOVER_JITTER_MAX_SECONDS", "240"))
+
+
+def _fetch_with_status(loop, connector, etag, label):
+    """Run one connector's fetch inside the task's legacy sync event-loop and return
+    (jobs, status, etag_after). Reads the connector's `status` side-effect (set by the
+    new plan-aware connectors) and falls back to inferring from the list length for the
+    older connectors that only ever return a list. Raises ConnectorBackoffError on a
+    429/5xx so the caller can back that provider off for the rest of the run."""
+    try:
+        params = inspect.signature(connector.fetch_jobs).parameters
+        if "etag" in params:
+            jobs = loop.run_until_complete(connector.fetch_jobs(etag=etag))
+        else:
+            jobs = loop.run_until_complete(connector.fetch_jobs())
+    except ConnectorBackoffError:
+        raise
+    except Exception as exc:
+        print(f"Error fetching ({label}): {exc}")
+        return [], ERROR, getattr(connector, "etag", None)
+
+    status = getattr(connector, "status", None)
+    if status not in (SUCCESS_WITH_JOBS, SUCCESS_EMPTY, NOT_SUPPORTED_OR_UNAVAILABLE, ERROR):
+        status = SUCCESS_WITH_JOBS if jobs else SUCCESS_EMPTY
+    return jobs, status, getattr(connector, "etag", None)
 
 
 def _upgrade_via_known_ats(apply_url, loop):
@@ -91,9 +132,15 @@ def discover_jobs_task():
     loop = asyncio.get_event_loop()
     if db.db is None:
         loop.run_until_complete(db.connect())
-    
+
     # Fetch watchlists
     watchlists = loop.run_until_complete(db.db.company_watchlists.find({"enabled": True}).to_list(length=100))
+
+    # Per-provider circuit breaker for the entire run: once a provider returns a
+    # 429/5xx (ConnectorBackoffError), skip it for every remaining company in this
+    # run rather than hammering it; the next hourly run retries it fresh.
+    provider_backoff = set()
+    now = datetime.now(timezone.utc)
 
     for wl in watchlists:
         connector_cfg = wl.get("connector", {})
@@ -106,17 +153,106 @@ def discover_jobs_task():
             "careersUrl": wl.get("careersUrl"),
         }
 
+        # Spread requests across the run so the top-of-hour doesn't fire every company's
+        # fetch back-to-back in a tight synchronous burst.
+        if JITTER_MAX_SECONDS > 0:
+            loop.run_until_complete(asyncio.sleep(random.uniform(0.0, JITTER_MAX_SECONDS)))
+
+        resolution = wl.get("resolved") or {}
+        resolved_type = resolution.get("resolvedConnectorType")
+        consecutive_failures = int(resolution.get("consecutiveFailures") or 0)
+        resolved_etags = resolution.get("etags") or {}
+
+        # Preferred order: if we already know a working provider for this company and it
+        # hasn't recently started failing, try it first/only before re-walking the chain.
+        if resolved_type and consecutive_failures < RESOLUTION_FAILURE_THRESHOLD:
+            chain = [resolved_type] + [c for c in priority if c != resolved_type]
+        else:
+            chain = list(priority)
+
         jobs = []
-        for c_type in priority:
+        chosen_type = None
+        chosen_status = None
+        connector_etags = dict(resolved_etags)
+        run_failed = False
+
+        for c_type in chain:
+            if c_type in provider_backoff:
+                continue
             connector = get_connector(c_type, config)
             if not connector:
                 continue
             try:
-                jobs = loop.run_until_complete(connector.fetch_jobs())
-                if jobs:
-                    break
-            except Exception as e:
-                print(f"Error fetching ({c_type}) for {wl.get('companyName')}: {e}")
+                jobs, status, etag_after = _fetch_with_status(
+                    loop, connector, resolved_etags.get(c_type), label=c_type
+                )
+            except ConnectorBackoffError as exc:
+                provider_backoff.add(c_type)
+                run_failed = True
+                print(f"Backing off ({c_type}) for {wl.get('companyName')}: {exc}")
+                continue
+
+            if etag_after:
+                connector_etags[c_type] = etag_after
+
+            if status == SUCCESS_WITH_JOBS:
+                chosen_type = c_type
+                chosen_status = status
+                break
+            if status == SUCCESS_EMPTY:
+                # Provider genuinely answered with zero jobs for right now. Remember it
+                # as a candidate so future runs prefer it, but keep walking the chain so
+                # a richer source can still supply jobs for this company this run.
+                if chosen_type is None:
+                    chosen_type = c_type
+                continue
+            if status == NOT_SUPPORTED_OR_UNAVAILABLE:
+                # This provider doesn't work for this company (plan/board absent); move on.
+                # If it was our previously-resolved provider it stopped working, so count
+                # it as a failure to eventually fall back to the full chain.
+                if c_type == resolved_type:
+                    run_failed = True
+                continue
+            # status == ERROR: the provider errored; treat as a failure, try the next one.
+            run_failed = True
+            continue
+
+        if chosen_type and chosen_status == SUCCESS_WITH_JOBS:
+            run_failed = False
+
+        # --- Persist per-company resolution state -------------------------------
+        new_failures = 0
+        if run_failed:
+            new_failures = consecutive_failures + 1
+
+        resolved_doc = {
+            # Which connector in the chain actually answered (with or without jobs).
+            "resolvedConnectorType": chosen_type,
+            # The exact config that worked -- mirrors the input config; kept separate so a
+            # future discovery could store a corrected token if boardToken differs from
+            # what the user entered.
+            "resolvedConfig": config,
+            # Last status from the fetched connector (success_with_jobs / success_empty /
+            # not_supported_or_unavailable / error).
+            "connectorStatus": chosen_status,
+            # The last successful discovery (fires even for success_empty, which is a
+            # healthy provider with no postings).
+            "lastSuccessAt": now if chosen_status in (
+                SUCCESS_WITH_JOBS, SUCCESS_EMPTY
+            ) else resolution.get("lastSuccessAt"),
+            # Consecutive failed runs of the resolved provider (used to trigger a re-walk
+            # of the full fallback chain once this crosses RESOLUTION_FAILURE_THRESHOLD).
+            "consecutiveFailures": new_failures,
+            # Optional ETag per provider, for conditional requests when supported.
+            "etags": connector_etags,
+        }
+
+        loop.run_until_complete(
+            db.db.company_watchlists.update_one(
+                {"_id": wl["_id"]},
+                {"$set": {"resolved": resolved_doc, "lastCheckedAt": now}},
+            )
+        )
 
         if jobs:
             jobs_dict = [job.model_dump() for job in jobs]

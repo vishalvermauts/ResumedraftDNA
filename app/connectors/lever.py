@@ -1,5 +1,5 @@
 import httpx
-from .base import BaseConnector, canonical_hash
+from .base import BaseConnector, canonical_hash, default_headers
 from ..schemas.job import JobPosting, Location
 
 class LeverConnector(BaseConnector):
@@ -8,7 +8,7 @@ class LeverConnector(BaseConnector):
         self.base_url = f"https://api.lever.co/v0/postings/{self.board_token}?mode=json"
 
     async def fetch_jobs(self):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(headers=default_headers()) as client:
             response = await client.get(self.base_url, timeout=10.0)
             response.raise_for_status()
             data = response.json()
