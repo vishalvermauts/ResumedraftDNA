@@ -10,6 +10,7 @@ import asyncio
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import timedelta, datetime, timezone
+from bson import ObjectId
 
 _GREENHOUSE_URL_RE = re.compile(r'(?:boards|job-boards)\.greenhouse\.io/([^/]+)/jobs/(\d+)')
 _LEVER_URL_RE = re.compile(r'jobs\.lever\.co/([^/]+)/([a-f0-9-]{20,})')
@@ -135,6 +136,127 @@ def _parse_grounded_json(text):
     except (json.JSONDecodeError, ValueError):
         return []
 
+def _run_discovery_for_one(s, loop, fs, now, force=False):
+    """Runs personalized discovery for a single automation_settings doc. Extracted from
+    personalized_discovery_task so a manual "Run Now" trigger (run_single_automation_task) can
+    execute the exact same matching logic for one record on demand, bypassing the frequency
+    throttle via force=True."""
+    titles = s.get("jobTitles") or []
+    if not titles:
+        return
+
+    if not force:
+        last_run = s.get("lastRunAt")
+        freq_hours = s.get("frequencyHours", 24)
+        if last_run:
+            last_run_utc = last_run if last_run.tzinfo else last_run.replace(tzinfo=timezone.utc)
+            if now - last_run_utc < timedelta(hours=freq_hours):
+                return
+
+    uid = s["uid"]
+    locations = s.get("locations") or ["Remote"]
+
+    existing_urls = {
+        d.to_dict().get("url")
+        for d in fs.collection("jobs").where("uid", "==", uid).stream()
+    }
+
+    # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
+    title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
+    corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
+    for job in corpus_matches:
+        apply_url = job.get("applyUrl") or job.get("canonicalUrl")
+        if not apply_url or apply_url in existing_urls:
+            continue
+        fs.collection("jobs").add({
+            "uid": uid,
+            "title": job.get("title", ""),
+            "company": job.get("companyName", ""),
+            "location": (job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
+            "description": job.get("descriptionText", ""),
+            "url": apply_url,
+            "source": job.get("source", "unknown"),
+            "foundVia": "automation",
+            "status": "saved",
+            "bookmarked": False,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        })
+        existing_urls.add(apply_url)
+
+    # 2) Web-wide fallback via Gemini + Search grounding, quota-guarded.
+    if not loop.run_until_complete(grounding_quota_available()):
+        print("Automation: grounding quota exhausted this month, skipping AI search fallback")
+        loop.run_until_complete(
+            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+        )
+        return
+
+    remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
+    prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
+{remote_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
+Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
+
+    try:
+        text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
+        loop.run_until_complete(record_grounding_usage())
+    except Exception as e:
+        print(f"Automation search failed for {uid}: {e}")
+        loop.run_until_complete(
+            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+        )
+        return
+
+    listings = _parse_grounded_json(text)
+
+    for item in listings:
+        if not isinstance(item, dict):
+            continue
+        apply_url = item.get("applyUrl")
+        title = item.get("title")
+        if not apply_url or not title or apply_url in existing_urls:
+            continue
+
+        upgraded = _upgrade_via_known_ats(apply_url, loop)
+        if upgraded:
+            fs.collection("jobs").add({
+                "uid": uid,
+                "title": upgraded.title,
+                "company": upgraded.companyName,
+                "location": upgraded.location[0].raw if upgraded.location else "",
+                "description": upgraded.descriptionText,
+                "url": upgraded.applyUrl,
+                "source": upgraded.source,
+                "foundVia": "automation",
+                "status": "saved",
+                "bookmarked": False,
+                "createdAt": firestore.SERVER_TIMESTAMP,
+                "updatedAt": firestore.SERVER_TIMESTAMP,
+            })
+            existing_urls.add(upgraded.applyUrl)
+            continue
+
+        fs.collection("jobs").add({
+            "uid": uid,
+            "title": title,
+            "company": item.get("company", ""),
+            "location": item.get("location", ""),
+            "description": item.get("description", ""),
+            "url": apply_url,
+            "source": "ai_search",
+            "foundVia": "automation",
+            "status": "saved",
+            "bookmarked": False,
+            "createdAt": firestore.SERVER_TIMESTAMP,
+            "updatedAt": firestore.SERVER_TIMESTAMP,
+        })
+        existing_urls.add(apply_url)
+
+    loop.run_until_complete(
+        db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
+    )
+
+
 @celery_app.task
 def personalized_discovery_task():
     """Per-user role/location job search. Checks two sources: (1) the shared job_postings
@@ -160,118 +282,24 @@ def personalized_discovery_task():
     fs = firestore.client()
 
     for s in settings_list:
-        titles = s.get("jobTitles") or []
-        if not titles:
-            continue
-
-        last_run = s.get("lastRunAt")
-        freq_hours = s.get("frequencyHours", 24)
-        if last_run:
-            last_run_utc = last_run if last_run.tzinfo else last_run.replace(tzinfo=timezone.utc)
-            if now - last_run_utc < timedelta(hours=freq_hours):
-                continue
-
-        uid = s["uid"]
-        locations = s.get("locations") or ["Remote"]
-
-        existing_urls = {
-            d.to_dict().get("url")
-            for d in fs.collection("jobs").where("uid", "==", uid).stream()
-        }
-
-        # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
-        title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
-        corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
-        for job in corpus_matches:
-            apply_url = job.get("applyUrl") or job.get("canonicalUrl")
-            if not apply_url or apply_url in existing_urls:
-                continue
-            fs.collection("jobs").add({
-                "uid": uid,
-                "title": job.get("title", ""),
-                "company": job.get("companyName", ""),
-                "location": (job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
-                "description": job.get("descriptionText", ""),
-                "url": apply_url,
-                "source": job.get("source", "unknown"),
-                "foundVia": "automation",
-                "status": "saved",
-                "bookmarked": False,
-                "createdAt": firestore.SERVER_TIMESTAMP,
-                "updatedAt": firestore.SERVER_TIMESTAMP,
-            })
-            existing_urls.add(apply_url)
-
-        # 2) Web-wide fallback via Gemini + Search grounding, quota-guarded.
-        if not loop.run_until_complete(grounding_quota_available()):
-            print("Automation: grounding quota exhausted this month, skipping AI search fallback")
-            loop.run_until_complete(
-                db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
-            )
-            continue
-
-        remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
-        prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
-{remote_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
-Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
-
-        try:
-            text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
-            loop.run_until_complete(record_grounding_usage())
-        except Exception as e:
-            print(f"Automation search failed for {uid}: {e}")
-            loop.run_until_complete(
-                db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
-            )
-            continue
-
-        listings = _parse_grounded_json(text)
-
-        for item in listings:
-            if not isinstance(item, dict):
-                continue
-            apply_url = item.get("applyUrl")
-            title = item.get("title")
-            if not apply_url or not title or apply_url in existing_urls:
-                continue
-
-            upgraded = _upgrade_via_known_ats(apply_url, loop)
-            if upgraded:
-                fs.collection("jobs").add({
-                    "uid": uid,
-                    "title": upgraded.title,
-                    "company": upgraded.companyName,
-                    "location": upgraded.location[0].raw if upgraded.location else "",
-                    "description": upgraded.descriptionText,
-                    "url": upgraded.applyUrl,
-                    "source": upgraded.source,
-                    "foundVia": "automation",
-                    "status": "saved",
-                    "bookmarked": False,
-                    "createdAt": firestore.SERVER_TIMESTAMP,
-                    "updatedAt": firestore.SERVER_TIMESTAMP,
-                })
-                existing_urls.add(upgraded.applyUrl)
-                continue
-
-            fs.collection("jobs").add({
-                "uid": uid,
-                "title": title,
-                "company": item.get("company", ""),
-                "location": item.get("location", ""),
-                "description": item.get("description", ""),
-                "url": apply_url,
-                "source": "ai_search",
-                "foundVia": "automation",
-                "status": "saved",
-                "bookmarked": False,
-                "createdAt": firestore.SERVER_TIMESTAMP,
-                "updatedAt": firestore.SERVER_TIMESTAMP,
-            })
-            existing_urls.add(apply_url)
-
-        loop.run_until_complete(
-            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
-        )
+        _run_discovery_for_one(s, loop, fs, now, force=False)
 
     return "Personalized discovery completed"
+
+
+@celery_app.task
+def run_single_automation_task(setting_id):
+    """Manual "Run Now" trigger for one automation_settings record, queued from
+    POST /automation-settings/{id}/run-now. Runs the same matching logic as the hourly beat
+    job but for a single record and bypassing the frequency throttle."""
+    loop = asyncio.get_event_loop()
+    if db.db is None:
+        loop.run_until_complete(db.connect())
+
+    s = loop.run_until_complete(db.db.automation_settings.find_one({"_id": ObjectId(setting_id)}))
+    if not s:
+        return "Settings not found"
+
+    fs = firestore.client()
+    _run_discovery_for_one(s, loop, fs, datetime.now(timezone.utc), force=True)
+    return "Manual run completed"
