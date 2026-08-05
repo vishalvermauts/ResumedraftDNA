@@ -97,7 +97,12 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
     return {"status": "started", "count": total, "companies": per_company}
 
 @router.get("/jobs")
-async def get_scouted_jobs(personalized: bool = False, user: dict = Depends(get_current_user)):
+async def get_scouted_jobs(
+    personalized: bool = False,
+    page: int = 1,
+    limit: int = 20,
+    user: dict = Depends(get_current_user)
+):
     query_filter = {}
     uid = user.get("uid")
 
@@ -135,9 +140,10 @@ async def get_scouted_jobs(personalized: bool = False, user: dict = Depends(get_
         else:
             return []
 
-    # Fetch jobs from MongoDB
-    cursor = db.db.job_postings.find(query_filter).sort("discoveredAt", -1).limit(100)
-    jobs = await cursor.to_list(length=100)
+    # Fetch jobs from MongoDB with pagination
+    skip = (page - 1) * limit
+    cursor = db.db.job_postings.find(query_filter).sort("discoveredAt", -1).skip(skip).limit(limit)
+    jobs = await cursor.to_list(length=limit)
     for job in jobs:
         job["id"] = str(job["_id"])
         del job["_id"]
