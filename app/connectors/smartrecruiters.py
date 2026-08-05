@@ -130,6 +130,8 @@ class SmartRecruitersConnector(BaseConnector):
             country = (loc.get("country") or "") if isinstance(loc, dict) else ""
             loc_raw = ", ".join(p for p in (city, country) if p) or "Remote"
             canonical_url = item.get("url") or item.get("applyUrl") or ""
+            if not canonical_url and self.board_token and job_id:
+                canonical_url = f"https://jobs.smartrecruiters.com/{self.board_token}/{job_id}"
             apply_url = item.get("applyUrl") or canonical_url
             h = canonical_hash(
                 "smartrecruiters", job_id, self.board_token or "", title, loc_raw, canonical_url
