@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 from .base import (
     BaseConnector,
@@ -13,30 +14,14 @@ from .base import (
 )
 from ..schemas.job import JobPosting, Location
 
+# Cap concurrent per-job detail requests so a company with a large board (seen: 100+ postings)
+# doesn't fire that many simultaneous connections at once.
+_DETAIL_FETCH_CONCURRENCY = 10
+
 
 # A 200 with this shape means the company's public posting feed is empty, which is
 # plan-dependent (many companies on SmartRecruiters don't expose a public feed).
 _NOT_AVAILABLE_BODIES = None
-
-
-def _description_to_text(desc) -> str:
-    """SmartRecruiters returns the posting description as either plain text or a
-    nested structure (sections). Flatten the ones we can read into plain text."""
-    if not desc:
-        return ""
-    if isinstance(desc, str):
-        return html_to_text(desc)
-    if isinstance(desc, dict):
-        text = desc.get("text") or desc.get("description")
-        if text:
-            return html_to_text(str(text))
-        parts = []
-        for section in desc.get("jobAdSectionList") or []:
-            body = section.get("text") or section.get("body")
-            if body:
-                parts.append(html_to_text(str(body)))
-        return "\n\n".join(p for p in parts if p)
-    return ""
 
 
 class SmartRecruitersConnector(BaseConnector):
@@ -47,13 +32,36 @@ class SmartRecruitersConnector(BaseConnector):
     fall through to the next connector type. A 429 / 5xx backs the provider off for
     the run. Response shape verified live (2026): top-level `{"totalFound", ...,
     "content": [...]}` where each item has `id`, `name`, `location{city,country}`,
-    `applyUrl`, `url`, `description`."""
+    `applyUrl`, `url` -- NOT a usable `description`: the list endpoint's `description`
+    key is always absent/None (only a `defaultJobAd: true` boolean flag), the real text
+    only exists behind a per-posting detail call (`GET .../postings/{id}`, response
+    `jobAd.sections.{companyDescription,jobDescription,qualifications,
+    additionalInformation}.text`, each an HTML string, some empty). Confirmed live: a
+    naive read of the list item's `description` silently produced an empty string for
+    every SmartRecruiters job ever ingested, which meant description-text search/
+    filtering (e.g. automation's visaSponsorshipOnly) could never match a SmartRecruiters
+    posting even when the real text plainly said "eligible for visa sponsorship"."""
 
     def __init__(self, config: dict):
         super().__init__(config)
         self.base_url = (
             f"https://api.smartrecruiters.com/v1/companies/{self.board_token}/postings"
         )
+
+    async def _fetch_description(self, client: httpx.AsyncClient, posting_id: str, sem: asyncio.Semaphore) -> str:
+        async with sem:
+            try:
+                resp = await client.get(f"{self.base_url}/{posting_id}", headers=default_headers())
+                if resp.status_code != 200:
+                    return ""
+                sections = (resp.json().get("jobAd") or {}).get("sections") or {}
+                parts = [html_to_text(sec.get("text", "")) for sec in sections.values() if sec.get("text")]
+                return "\n\n".join(parts)
+            except (httpx.HTTPError, ValueError):
+                # A single posting's detail call failing (timeout, bad JSON, etc.) shouldn't
+                # drop the posting entirely -- it still has a real title/url/location, just
+                # without description text this one time.
+                return ""
 
     async def fetch_jobs(self, etag=None):
         headers = default_headers()
@@ -99,12 +107,24 @@ class SmartRecruitersConnector(BaseConnector):
             self.status = NOT_SUPPORTED_OR_UNAVAILABLE
             return []
 
-        jobs = []
+        valid_items = []
         for item in content:
             job_id = str(item.get("id") or item.get("refNumber") or item.get("ref") or "")
             title = item.get("name") or item.get("jobTitle")
-            if not job_id or not title:
-                continue
+            if job_id and title:
+                valid_items.append((job_id, title, item))
+
+        # The list endpoint never has real description text (see class docstring) -- fetch it
+        # per-posting, concurrently (capped), so descriptionText is actually searchable/
+        # filterable instead of silently always empty.
+        sem = asyncio.Semaphore(_DETAIL_FETCH_CONCURRENCY)
+        async with httpx.AsyncClient(timeout=15.0) as detail_client:
+            descriptions = await asyncio.gather(*[
+                self._fetch_description(detail_client, job_id, sem) for job_id, _, _ in valid_items
+            ])
+
+        jobs = []
+        for (job_id, title, item), description in zip(valid_items, descriptions):
             loc = item.get("location") or {}
             city = (loc.get("city") or "") if isinstance(loc, dict) else ""
             country = (loc.get("country") or "") if isinstance(loc, dict) else ""
@@ -121,7 +141,7 @@ class SmartRecruitersConnector(BaseConnector):
                 companyName=self.board_token or self.company_name or "",
                 title=title,
                 location=[Location(raw=loc_raw)],
-                descriptionText=_description_to_text(item.get("description")),
+                descriptionText=description,
                 applyUrl=apply_url,
                 canonicalUrl=canonical_url,
             ))

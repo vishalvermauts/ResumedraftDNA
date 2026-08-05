@@ -11,8 +11,10 @@ from .connectors.base import (
     SUCCESS_EMPTY,
     NOT_SUPPORTED_OR_UNAVAILABLE,
     ERROR,
+    ConnectorError,
     ConnectorBackoffError,
 )
+from .connectors.adzuna import search_by_keywords as adzuna_search_by_keywords
 from .ai.gemini import gemini_client
 from .ai.quota import grounding_quota_available, record_grounding_usage
 import asyncio
@@ -260,6 +262,18 @@ def discover_jobs_task():
 
     return "Discovery task completed"
 
+_SPONSORSHIP_RE = re.compile(r'\bsponsor(ship)?\b|\bvisa\s+sponsor|\bwill\s+sponsor', re.IGNORECASE)
+
+
+def _mentions_sponsorship(description: str) -> bool:
+    """Heuristic, not a structured field -- none of the connectors (Adzuna included) expose
+    visa sponsorship as a real filter, so this scans the description text every source
+    already returns. Deliberately broad (matches "sponsor"/"sponsorship"/"visa sponsor"/"will
+    sponsor") since postings phrase this inconsistently; false positives from an unrelated
+    "sponsor" mention are possible but rare in job description text."""
+    return bool(_SPONSORSHIP_RE.search(description or ""))
+
+
 def _parse_grounded_json(text):
     cleaned = (text or "").strip()
     if cleaned.startswith("```"):
@@ -297,96 +311,108 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
         for d in fs.collection("jobs").where("uid", "==", uid).stream()
     }
 
-    # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
-    title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
-    corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
-    for job in corpus_matches:
-        apply_url = job.get("applyUrl") or job.get("canonicalUrl")
-        if not apply_url or apply_url in existing_urls:
-            continue
-        fs.collection("jobs").add({
-            "uid": uid,
-            "title": job.get("title", ""),
-            "company": job.get("companyName", ""),
-            "location": (job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
-            "description": job.get("descriptionText", ""),
-            "url": apply_url,
-            "source": job.get("source", "unknown"),
-            "foundVia": "automation",
-            "status": "saved",
-            "bookmarked": False,
-            "createdAt": firestore.SERVER_TIMESTAMP,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-        existing_urls.add(apply_url)
+    # Which connectors may contribute matches -- empty means no restriction (every source),
+    # which is also what a pre-existing doc without this field gets via `.get(...) or []`.
+    sources = s.get("sources") or []
+    source_allowed = (lambda src: not sources or src in sources)
+    visa_only = s.get("visaSponsorshipOnly", False)
 
-    # 2) Web-wide fallback via Gemini + Search grounding, quota-guarded.
-    if not loop.run_until_complete(grounding_quota_available()):
-        print("Automation: grounding quota exhausted this month, skipping AI search fallback")
-        loop.run_until_complete(
-            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
-        )
-        return
-
-    remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
-    prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
-{remote_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
-Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
-
-    try:
-        text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
-        loop.run_until_complete(record_grounding_usage())
-    except Exception as e:
-        print(f"Automation search failed for {uid}: {e}")
-        loop.run_until_complete(
-            db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
-        )
-        return
-
-    listings = _parse_grounded_json(text)
-
-    for item in listings:
-        if not isinstance(item, dict):
-            continue
-        apply_url = item.get("applyUrl")
-        title = item.get("title")
-        if not apply_url or not title or apply_url in existing_urls:
-            continue
-
-        upgraded = _upgrade_via_known_ats(apply_url, loop)
-        if upgraded:
-            fs.collection("jobs").add({
-                "uid": uid,
-                "title": upgraded.title,
-                "company": upgraded.companyName,
-                "location": upgraded.location[0].raw if upgraded.location else "",
-                "description": upgraded.descriptionText,
-                "url": upgraded.applyUrl,
-                "source": upgraded.source,
-                "foundVia": "automation",
-                "status": "saved",
-                "bookmarked": False,
-                "createdAt": firestore.SERVER_TIMESTAMP,
-                "updatedAt": firestore.SERVER_TIMESTAMP,
-            })
-            existing_urls.add(upgraded.applyUrl)
-            continue
-
+    def _save_job(*, title, company, location, description, url, source):
+        if not url or url in existing_urls:
+            return
+        if visa_only and not _mentions_sponsorship(description):
+            return
         fs.collection("jobs").add({
             "uid": uid,
             "title": title,
-            "company": item.get("company", ""),
-            "location": item.get("location", ""),
-            "description": item.get("description", ""),
-            "url": apply_url,
-            "source": "ai_search",
+            "company": company,
+            "location": location,
+            "description": description,
+            "url": url,
+            "source": source,
             "foundVia": "automation",
             "status": "saved",
             "bookmarked": False,
             "createdAt": firestore.SERVER_TIMESTAMP,
             "updatedAt": firestore.SERVER_TIMESTAMP,
         })
-        existing_urls.add(apply_url)
+        existing_urls.add(url)
+
+    # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
+    #    Restricted to the selected sources when the user has narrowed them (each corpus doc's
+    #    own `source` field is the connector that originally found it -- "greenhouse", "lever",
+    #    "jsonld", "ashby", "recruitee", "smartrecruiters", or "adzuna").
+    title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
+    if sources:
+        title_query = {"$and": [title_query, {"source": {"$in": sources}}]}
+    corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
+    for job in corpus_matches:
+        _save_job(
+            title=job.get("title", ""),
+            company=job.get("companyName", ""),
+            location=(job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
+            description=job.get("descriptionText", ""),
+            url=job.get("applyUrl") or job.get("canonicalUrl"),
+            source=job.get("source", "unknown"),
+        )
+
+    # 2) Adzuna, queried live and directly by keyword -- unlike the ATS connectors above,
+    #    Adzuna is a broad aggregator that can be searched by title/location on demand, not
+    #    just pre-scraped per watched company, so this runs independently of the corpus step.
+    if source_allowed("adzuna"):
+        country = (s.get("country") or "us").lower()
+        try:
+            adzuna_jobs = loop.run_until_complete(adzuna_search_by_keywords(
+                titles, locations=locations, country=country, remote_only=s.get("remoteOnly", False),
+            ))
+        except (ConnectorError, ConnectorBackoffError) as e:
+            print(f"Automation: Adzuna search failed for {uid}: {e}")
+            adzuna_jobs = []
+        for job in adzuna_jobs:
+            _save_job(
+                title=job.title, company=job.companyName,
+                location=job.location[0].raw if job.location else "",
+                description=job.descriptionText, url=job.applyUrl, source="adzuna",
+            )
+
+    # 3) Web-wide fallback via Gemini + Search grounding, quota-guarded.
+    if source_allowed("ai_search"):
+        if not loop.run_until_complete(grounding_quota_available()):
+            print("Automation: grounding quota exhausted this month, skipping AI search fallback")
+        else:
+            remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
+            visa_clause = "Only include postings that explicitly mention visa sponsorship is available. " if visa_only else ""
+            prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
+{remote_clause}{visa_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
+Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
+            try:
+                text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
+                loop.run_until_complete(record_grounding_usage())
+                listings = _parse_grounded_json(text)
+            except Exception as e:
+                print(f"Automation: AI search failed for {uid}: {e}")
+                listings = []
+
+            for item in listings:
+                if not isinstance(item, dict):
+                    continue
+                apply_url = item.get("applyUrl")
+                title = item.get("title")
+                if not apply_url or not title:
+                    continue
+
+                upgraded = _upgrade_via_known_ats(apply_url, loop)
+                if upgraded:
+                    _save_job(
+                        title=upgraded.title, company=upgraded.companyName,
+                        location=upgraded.location[0].raw if upgraded.location else "",
+                        description=upgraded.descriptionText, url=upgraded.applyUrl, source=upgraded.source,
+                    )
+                else:
+                    _save_job(
+                        title=title, company=item.get("company", ""), location=item.get("location", ""),
+                        description=item.get("description", ""), url=apply_url, source="ai_search",
+                    )
 
     loop.run_until_complete(
         db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})

@@ -5,6 +5,7 @@ from .ai_search import AiSearchConnector
 from .ashby import AshbyConnector
 from .recruitee import RecruiteeConnector
 from .smartrecruiters import SmartRecruitersConnector
+from .adzuna import AdzunaConnector
 
 # Adding a new job source = write one connector class implementing fetch_jobs(), add one line
 # here. No changes needed in scout.py or worker.py's polling loop.
@@ -16,6 +17,7 @@ CONNECTOR_REGISTRY = {
     "ashby": AshbyConnector,
     "recruitee": RecruiteeConnector,
     "smartrecruiters": SmartRecruitersConnector,
+    "adzuna": AdzunaConnector,
 }
 
 

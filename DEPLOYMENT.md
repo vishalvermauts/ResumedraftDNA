@@ -58,6 +58,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 FIREBASE_PROJECT_ID=your_project_id
 MONGODB_URI=mongodb://mongo:27017/resumedraft
 REDIS_URL=redis://redis:6379
+ADZUNA_APP_ID=your_adzuna_app_id
+ADZUNA_APP_KEY=your_adzuna_app_key
 EOF
 ```
 *Note: Make sure to populate these values with your actual API keys and IDs.*
