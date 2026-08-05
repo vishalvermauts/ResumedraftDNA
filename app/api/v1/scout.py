@@ -65,10 +65,47 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
     return {"status": "started", "count": total, "companies": per_company}
 
 @router.get("/jobs")
-async def get_scouted_jobs(user: dict = Depends(get_current_user)):
-    # Fetch all jobs from MongoDB
-    cursor = db.db.job_postings.find({}).sort("discoveredAt", -1).limit(50)
-    jobs = await cursor.to_list(length=50)
+async def get_scouted_jobs(personalized: bool = False, user: dict = Depends(get_current_user)):
+    query_filter = {}
+    uid = user.get("uid")
+
+    if personalized and uid:
+        # Fetch user's active automation settings
+        settings = await db.db.automation_settings.find_one({"uid": uid})
+        if settings:
+            and_clauses = []
+            
+            # 1. Match job titles
+            titles = settings.get("jobTitles") or []
+            if titles:
+                title_regexes = [{"title": {"$regex": t, "$options": "i"}} for t in titles if t]
+                if title_regexes:
+                    and_clauses.append({"$or": title_regexes})
+            
+            # 2. Match locations
+            locations = settings.get("locations") or []
+            if locations:
+                loc_regexes = []
+                for loc in locations:
+                    if not loc:
+                        continue
+                    # Strip country/state suffix to match city name broadly (e.g. "Sydney" matches "Sydney, Australia")
+                    city = loc.split(",")[0].strip()
+                    loc_regexes.append({"location.raw": {"$regex": city, "$options": "i"}})
+                    loc_regexes.append({"location": {"$regex": city, "$options": "i"}})
+                if loc_regexes:
+                    and_clauses.append({"$or": loc_regexes})
+
+            if and_clauses:
+                query_filter = {"$and": and_clauses}
+            else:
+                return []
+        else:
+            return []
+
+    # Fetch jobs from MongoDB
+    cursor = db.db.job_postings.find(query_filter).sort("discoveredAt", -1).limit(100)
+    jobs = await cursor.to_list(length=100)
     for job in jobs:
         job["id"] = str(job["_id"])
         del job["_id"]
