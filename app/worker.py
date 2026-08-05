@@ -360,7 +360,20 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
     #    Adzuna is a broad aggregator that can be searched by title/location on demand, not
     #    just pre-scraped per watched company, so this runs independently of the corpus step.
     if source_allowed("adzuna"):
-        country = (s.get("country") or "us").lower()
+        # Auto-detect country code from location strings, defaulting to US
+        country = "us"
+        locs_combined = " ".join(locations).lower()
+        if "australia" in locs_combined or "nsw" in locs_combined or "vic" in locs_combined or "qld" in locs_combined or "wa" in locs_combined or "act" in locs_combined:
+            country = "au"
+        elif "united kingdom" in locs_combined or "london" in locs_combined or " uk" in locs_combined or "gb" in locs_combined:
+            country = "gb"
+        elif "canada" in locs_combined or " ca" in locs_combined:
+            country = "ca"
+        elif "germany" in locs_combined or " de" in locs_combined:
+            country = "de"
+        elif s.get("country"):
+            country = s.get("country").lower()
+
         try:
             adzuna_jobs = loop.run_until_complete(adzuna_search_by_keywords(
                 titles, locations=locations, country=country, remote_only=s.get("remoteOnly", False),
