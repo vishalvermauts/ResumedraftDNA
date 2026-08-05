@@ -3,6 +3,7 @@ import re
 import json
 import random
 import inspect
+import hashlib
 from celery import Celery
 from .db.mongo import db
 from .connectors.registry import get_connector
@@ -318,25 +319,24 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
     visa_only = s.get("visaSponsorshipOnly", False)
 
     def _save_job(*, title, company, location, description, url, source):
-        if not url or url in existing_urls:
+        if not url:
             return
         if visa_only and not _mentions_sponsorship(description):
             return
-        fs.collection("jobs").add({
-            "uid": uid,
+        
+        canonical_hash = hashlib.sha256((url or f"{company}_{title}").encode()).hexdigest()
+        job_doc = {
+            "canonicalHash": canonical_hash,
             "title": title,
-            "company": company,
-            "location": location,
-            "description": description,
-            "url": url,
+            "companyName": company,
+            "location": [{"raw": location}],
+            "descriptionText": description,
+            "applyUrl": url,
+            "canonicalUrl": url,
             "source": source,
-            "foundVia": "automation",
-            "status": "saved",
-            "bookmarked": False,
-            "createdAt": firestore.SERVER_TIMESTAMP,
-            "updatedAt": firestore.SERVER_TIMESTAMP,
-        })
-        existing_urls.add(url)
+            "discoveredAt": datetime.now(timezone.utc)
+        }
+        loop.run_until_complete(db.upsert_job(job_doc))
 
     # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
     #    Restricted to the selected sources when the user has narrowed them (each corpus doc's
