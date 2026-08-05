@@ -29,6 +29,38 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
     uid = user.get("uid")
     watchlists = await db.db.company_watchlists.find({"uid": uid, "enabled": True}).to_list(length=100)
     if not watchlists:
+        # Auto-sync from Firestore if MongoDB watchlists are missing (e.g. database reset)
+        try:
+            from firebase_admin import firestore
+            from datetime import datetime
+            fs = firestore.client()
+            fs_docs = fs.collection("company_watchlist").where("uid", "==", uid).where("active", "==", True).stream()
+            for doc in fs_docs:
+                data = doc.to_dict()
+                wl_doc = {
+                    "companyName": data.get("companyName"),
+                    "careersUrl": data.get("careersUrl"),
+                    "connector": {
+                        "type": data.get("connectorType"),
+                        "boardToken": data.get("boardToken"),
+                        "priority": data.get("priority") or [data.get("connectorType"), "jsonld", "ai_search"],
+                        "configuration": {}
+                    },
+                    "pollingFrequencyMinutes": 720,
+                    "enabled": True,
+                    "uid": uid,
+                    "createdAt": datetime.utcnow(),
+                    "nextRunAt": datetime.utcnow()
+                }
+                result = await db.db.company_watchlists.insert_one(wl_doc)
+                doc.reference.update({"mongoId": str(result.inserted_id)})
+            
+            # Re-fetch from MongoDB
+            watchlists = await db.db.company_watchlists.find({"uid": uid, "enabled": True}).to_list(length=100)
+        except Exception as sync_err:
+            print(f"Scout: Watchlist auto-sync from Firestore failed: {sync_err}")
+
+    if not watchlists:
         raise HTTPException(status_code=400, detail="No companies on your watchlist yet -- add one first.")
 
     total = 0
