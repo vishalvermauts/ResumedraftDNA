@@ -402,10 +402,20 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
         title_query = {"$and": [title_query, {"source": {"$in": sources}}]}
     corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
     for job in corpus_matches:
+        # Extract location parsing dynamically to handle nested dicts and list structures
+        raw_location = ""
+        job_loc = job.get("location")
+        if isinstance(job_loc, list) and len(job_loc) > 0:
+            raw_location = job_loc[0].get("raw", "") if isinstance(job_loc[0], dict) else str(job_loc[0])
+        elif isinstance(job_loc, dict):
+            raw_location = job_loc.get("fullLocation") or job_loc.get("city") or job_loc.get("raw") or ""
+        elif job_loc:
+            raw_location = str(job_loc)
+
         _save_job(
             title=job.get("title", ""),
             company=job.get("companyName", ""),
-            location=(job.get("location") or [{}])[0].get("raw", "") if job.get("location") else "",
+            location=raw_location,
             description=job.get("descriptionText", ""),
             url=job.get("applyUrl") or job.get("canonicalUrl"),
             source=job.get("source", "unknown"),
