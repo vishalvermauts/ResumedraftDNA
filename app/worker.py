@@ -318,12 +318,45 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
     source_allowed = (lambda src: not sources or src in sources)
     visa_only = s.get("visaSponsorshipOnly", False)
 
+    # Handle country-wide filters (e.g., "Australia (All Locations)" matches any job in Australia)
+    has_country_filters = False
+    target_countries = []
+    for loc in locations:
+        if "all locations" in loc.lower():
+            has_country_filters = True
+            country_name = loc.split("(")[0].strip().lower()
+            target_countries.append(country_name)
+
     def _save_job(*, title, company, location, description, url, source):
         if not url:
             return
         if visa_only and not _mentions_sponsorship(description):
             return
         
+        # Check location constraints
+        if locations and "remote" not in [l.lower() for l in locations]:
+            matched_loc = False
+            # Check country-level match (e.g., if Australia (All Locations) is selected, match 'au' or 'australia')
+            if has_country_filters:
+                loc_lower = str(location).lower()
+                for c_name in target_countries:
+                    # Match 'australia' or country abbreviation 'au'
+                    if c_name in loc_lower or (c_name == "australia" and (" au" in loc_lower or ", au" in loc_lower or loc_lower == "au")):
+                        matched_loc = True
+                        break
+            
+            # Check city-level match
+            if not matched_loc:
+                for loc_str in locations:
+                    city_part = loc_str.split(",")[0].strip().lower()
+                    if city_part in str(location).lower():
+                        matched_loc = True
+                        break
+            
+            if not matched_loc and location:
+                # Filter out this job as it is not in the user's targeted locations
+                return
+
         canonical_hash = hashlib.sha256((url or f"{company}_{title}").encode()).hexdigest()
         job_doc = {
             "canonicalHash": canonical_hash,
@@ -337,6 +370,28 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             "discoveredAt": datetime.now(timezone.utc)
         }
         loop.run_until_complete(db.upsert_job(job_doc))
+
+        # Mirror copy directly into Firestore 'jobs' collection for the user so it populates the AI Job Scout
+        if url not in existing_urls:
+            try:
+                fs.collection("jobs").add({
+                    "uid": uid,
+                    "title": title,
+                    "company": company,
+                    "location": location,
+                    "url": url,
+                    "description": description,
+                    "source": source,
+                    "foundVia": "scout",
+                    "status": "saved",
+                    "bookmarked": False,
+                    "createdAt": datetime.now(timezone.utc),
+                    "updatedAt": datetime.now(timezone.utc),
+                    "canonicalHash": canonical_hash
+                })
+                existing_urls.add(url)
+            except Exception as fs_job_err:
+                print(f"Automation: Failed to sync job to user Firestore collection: {fs_job_err}")
 
     # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
     #    Restricted to the selected sources when the user has narrowed them (each corpus doc's
@@ -430,6 +485,15 @@ Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "de
     loop.run_until_complete(
         db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
     )
+    # Sync back to Firestore so frontend UI shows updated runtime instead of "Never ran"
+    try:
+        firestore_id = s.get("firestoreId") or str(s["_id"])
+        fs.collection("automation_settings").document(firestore_id).update({
+            "lastRun": now.isoformat()
+        })
+    except Exception as fs_err:
+        print(f"Automation: Failed to sync lastRun back to Firestore for settings {s.get('_id')}: {fs_err}")
+
 
 
 @celery_app.task

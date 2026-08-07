@@ -94,6 +94,13 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
             total += len(jobs)
         per_company.append({"companyName": wl.get("companyName"), "count": len(jobs), "connector": used_connector})
 
+    # Trigger a background personalized discovery run so matching jobs populate the Scout panel immediately
+    try:
+        from ...worker import personalized_discovery_task
+        personalized_discovery_task.delay()
+    except Exception as e:
+        print(f"Scout: Failed to chain personalized discovery: {e}")
+
     return {"status": "started", "count": total, "companies": per_company}
 
 @router.get("/jobs")
