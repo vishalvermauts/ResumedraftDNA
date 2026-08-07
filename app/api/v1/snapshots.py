@@ -53,8 +53,30 @@ async def set_master_resume(
         {"$set": {"active": True}}
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Snapshot not found for this resume")
+    # If the snapshot doesn't exist yet in Mongo, pull it dynamically from Firestore and seed it
+    if result.matched_count == 0:
+        from google.cloud import firestore
+        fs = firestore.client()
+        res_doc = fs.collection("resumes").document(firestore_resume_id).get()
+        if not res_doc.exists:
+            raise HTTPException(status_code=404, detail="Resume not found in Firestore")
+        
+        res_data = res_doc.to_dict()
+        structured_data = res_data.get("data", {})
+        
+        content_str = json.dumps(structured_data, sort_keys=True)
+        content_hash = hashlib.sha256(content_str.encode()).hexdigest()
+        
+        snapshot_doc = {
+            "uid": user["uid"],
+            "firestoreResumeId": firestore_resume_id,
+            "version": 1,
+            "contentHash": content_hash,
+            "structuredData": structured_data,
+            "active": True,
+            "createdAt": datetime.utcnow()
+        }
+        await db.db.resume_snapshots.insert_one(snapshot_doc)
         
     return {"status": "success"}
 
