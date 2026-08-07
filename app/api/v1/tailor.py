@@ -24,19 +24,24 @@ async def tailor_resume(
         raise HTTPException(status_code=404, detail="No active resume snapshot found")
 
     import json
+    import os
 
+    # Load system prompt rules dynamically from standalone Markdown files
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if type == "coverLetter":
-        system = """You are an expert recruiter and career coach.
-Write a compelling, personalized cover letter for the candidate (described by the Master Resume) applying to the target Job Description (JD).
-Use the JD's keywords and tone. Keep it concise (3-4 paragraphs).
-Return ONLY valid JSON. The 'coverLetter' field must contain the full cover letter text as a plain string. Leave 'tailoredResume' null."""
+        prompt_path = os.path.join(base_dir, "ai", "prompts", "cover_letter.md")
     else:
-        system = """You are an expert recruiter and resume writer.
-Your task is to take the provided Master Resume and create a Tailored Resume for the target Job Description (JD).
-Follow these strict rules:
-1. FILTERING: Review the Master Resume's certifications, projects, volunteer work, and experience. Include ONLY the items that are relevant to the provided Job Description (JD). If a project or volunteer section is not relevant, OMIT it from the output.
-2. TAILORING: Rephrase existing experience bullet points to emphasize skills and achievements found in the JD. Use the JD's keywords.
-3. STRUCTURE: Return ONLY valid JSON. The 'tailoredResume' field must be a JSON-encoded STRING containing an object with the exact same shape as the Master Resume. Leave 'coverLetter' null."""
+        prompt_path = os.path.join(base_dir, "ai", "prompts", "resume_tailor.md")
+
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            system = f.read()
+    except Exception as e:
+        print(f"Failed to read prompt rules file at {prompt_path}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="System prompt configuration missing or unreadable on backend."
+        )
 
     prompt = f"MASTER RESUME:\n{json.dumps(resume_snapshot['structuredData'])}\n\nJOB DESCRIPTION:\n{req.description}"
 
