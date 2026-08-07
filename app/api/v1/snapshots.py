@@ -55,8 +55,17 @@ async def set_master_resume(
     
     # If the snapshot doesn't exist yet in Mongo, pull it dynamically from Firestore and seed it
     if result.matched_count == 0:
-        from google.cloud import firestore
-        fs = firestore.client()
+        import firebase_admin
+        from firebase_admin import firestore
+        try:
+            # Get the initialized Firestore client safely
+            fs = firestore.client()
+        except ValueError:
+            # If firebase_admin isn't initialized yet in this thread/module
+            from ...auth import cred
+            firebase_admin.initialize_app(cred, name="snapshots_fallback")
+            fs = firestore.client()
+
         res_doc = fs.collection("resumes").document(firestore_resume_id).get()
         if not res_doc.exists:
             raise HTTPException(status_code=404, detail="Resume not found in Firestore")
