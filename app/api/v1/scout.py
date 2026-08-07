@@ -108,17 +108,18 @@ async def get_scouted_jobs(
     personalized: bool = False,
     page: int = 1,
     limit: int = 20,
+    q: str = "",
     user: dict = Depends(get_current_user)
 ):
     query_filter = {}
     uid = user.get("uid")
 
+    and_clauses = []
+
     if personalized and uid:
         # Fetch user's active automation settings
         settings = await db.db.automation_settings.find_one({"uid": uid})
         if settings:
-            and_clauses = []
-            
             # 1. Match job titles
             titles = settings.get("jobTitles") or []
             if titles:
@@ -139,13 +140,26 @@ async def get_scouted_jobs(
                     loc_regexes.append({"location": {"$regex": city, "$options": "i"}})
                 if loc_regexes:
                     and_clauses.append({"$or": loc_regexes})
-
-            if and_clauses:
-                query_filter = {"$and": and_clauses}
-            else:
-                return []
         else:
             return []
+
+    # Apply search keyword query filter on top of personalization (or directly on explore directory)
+    if q.strip():
+        search_val = q.strip()
+        and_clauses.append({
+            "$or": [
+                {"title": {"$regex": search_val, "$options": "i"}},
+                {"companyName": {"$regex": search_val, "$options": "i"}},
+                {"descriptionText": {"$regex": search_val, "$options": "i"}},
+                {"location.raw": {"$regex": search_val, "$options": "i"}},
+                {"location": {"$regex": search_val, "$options": "i"}}
+            ]
+        })
+
+    if and_clauses:
+        query_filter = {"$and": and_clauses}
+    elif personalized:
+        return []
 
     # Fetch jobs from MongoDB with pagination
     skip = (page - 1) * limit
