@@ -454,7 +454,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             )
 
     # 3) Web-wide fallback via Gemini + Search grounding, quota-guarded.
-    if source_allowed("ai_search"):
+    if os.getenv("ENABLE_GEMINI_GROUNDING", "false").lower() == "true" and source_allowed("ai_search"):
         if not loop.run_until_complete(grounding_quota_available()):
             print("Automation: grounding quota exhausted this month, skipping AI search fallback")
         else:

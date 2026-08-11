@@ -23,6 +23,8 @@ class GeminiClient:
     async def generate_grounded(self, prompt: str) -> str:
         """Gemini + Google Search grounding. Billed per search query beyond the free monthly
         quota -- callers must gate this behind their own quota check (see connectors/ai_search.py)."""
+        if os.getenv("ENABLE_GEMINI_GROUNDING", "false").lower() != "true":
+            raise RuntimeError("Gemini grounding is disabled by ENABLE_GEMINI_GROUNDING")
         response = await self.client.aio.models.generate_content(
             model=self.model,
             contents=prompt,
