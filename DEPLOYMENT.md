@@ -133,3 +133,26 @@ sudo docker compose up -d --build
 - **Database**: We are using local Docker MongoDB for simplicity initially, but for production-level durability, **we strongly recommend moving to MongoDB Atlas**.
 - **Keys**: Never commit `.env` or `serviceAccountKey.json` to version control.
 - **Firewall**: Ensure `ufw` or AWS Security Groups restrict access to ports 80/443/22 to only known, authorized traffic.
+
+---
+
+## 7. Gemini API & Search Grounding Safeguards
+
+If you decide to re-enable the Google Search Grounding features (`ai_search` connector) in the future, adhere to the following safety precautions to prevent runaway billing spikes:
+
+### Cost Vulnerabilities
+* **No Free Tier**: Google AI Studio bills search grounding at **$0.01 per query** from the first request on pay-as-you-go keys.
+* **Celery Retry Loop Risk**: If the Celery background tasks (`personalized_discovery_task` or `discover_jobs_task`) fail at database write/commit stages (e.g. MongoDB or Redis connection lost), they can enter an infinite retrying loop. If Gemini is called *before* the task database state commit, each retry makes a new paid search grounding call.
+
+### Troubleshooting & verification steps (before re-enabling):
+1. **Check Redis & DB Health**: Always verify that Redis and MongoDB are running and responsive on the server:
+   ```bash
+   sudo docker compose exec redis redis-cli ping
+   ```
+   If Redis is down, **do not enable search grounding**. Bypassed budget limits will allow infinite calls.
+2. **Local Testing First**: Test the liveness check to ensure grounding acts correctly and counts queries properly:
+   ```bash
+   pytest tests/test_gemini_model_liveness.py -k test_gemini_model_liveness
+   ```
+3. **Verify Count Collection**: Check that query increments are recorded in MongoDB's `api_usage_counters` collection. If the collection fails to record updates, do not activate the feature.
+4. **Hard limit enforcement**: In `app/ai/quota.py`, verify `FREE_TIER_MONTHLY_LIMIT` is set to a low, safe threshold (e.g., `100` instead of `4500`) to protect against unexpected spikes during initial runs.

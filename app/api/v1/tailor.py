@@ -45,11 +45,14 @@ async def tailor_resume(
 
     prompt = f"MASTER RESUME:\n{json.dumps(resume_snapshot['structuredData'])}\n\nJOB DESCRIPTION:\n{req.description}"
 
+    feature_label = "cover_letter" if type == "coverLetter" else "resume_tailor"
     try:
         result = await gemini_client.generate_structured(
             system=system,
             user=prompt,
-            schema=TailoredArtifact
+            schema=TailoredArtifact,
+            feature=feature_label,
+            thinking_level="medium"
         )
         tailored_resume = json.loads(result.tailoredResume) if result.tailoredResume else None
     except Exception as e:
