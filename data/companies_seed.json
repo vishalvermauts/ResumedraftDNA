@@ -1,0 +1,848 @@
+[
+  {
+    "companyId": "comp-0001",
+    "name": "BHP",
+    "industry": "Mining & Resources",
+    "location": "Melbourne / Perth, Australia",
+    "careersUrl": "https://careers.bhp.com",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for BHP covering Mining & Resources opportunities."
+  },
+  {
+    "companyId": "comp-0002",
+    "name": "Rio Tinto",
+    "industry": "Mining & Resources",
+    "location": "Perth / Brisbane, Australia",
+    "careersUrl": "https://jobs.riotinto.com",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Rio Tinto covering Mining & Resources opportunities."
+  },
+  {
+    "companyId": "comp-0003",
+    "name": "Woodside Energy",
+    "industry": "Oil & Gas / Energy",
+    "location": "Perth, WA, Australia",
+    "careersUrl": "https://www.woodside.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Woodside Energy covering Oil & Gas / Energy opportunities."
+  },
+  {
+    "companyId": "comp-0004",
+    "name": "Fortescue Metals Group",
+    "industry": "Mining & Green Energy",
+    "location": "Perth, WA, Australia",
+    "careersUrl": "https://careers.fortescue.com",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Fortescue Metals Group covering Mining & Green Energy opportunities."
+  },
+  {
+    "companyId": "comp-0005",
+    "name": "Santos",
+    "industry": "Oil & Gas",
+    "location": "Adelaide / Brisbane, Australia",
+    "careersUrl": "https://www.santos.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Santos covering Oil & Gas opportunities."
+  },
+  {
+    "companyId": "comp-0006",
+    "name": "Origin Energy",
+    "industry": "Energy & Utilities",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.originenergy.com.au/about/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Origin Energy covering Energy & Utilities opportunities."
+  },
+  {
+    "companyId": "comp-0007",
+    "name": "Mineral Resources",
+    "industry": "Mining & Infrastructure",
+    "location": "Perth, WA, Australia",
+    "careersUrl": "https://careers.mineralresources.com.au",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Mineral Resources covering Mining & Infrastructure opportunities."
+  },
+  {
+    "companyId": "comp-0008",
+    "name": "Saipem",
+    "industry": "Offshore Engineering & Energy",
+    "location": "Perth / Global",
+    "careersUrl": "https://www.saipem.com/en/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Saipem covering Offshore Engineering & Energy opportunities."
+  },
+  {
+    "companyId": "comp-0009",
+    "name": "Worley",
+    "industry": "Engineering & Energy",
+    "location": "Sydney / Perth / Global",
+    "careersUrl": "https://www.worley.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Worley covering Engineering & Energy opportunities."
+  },
+  {
+    "companyId": "comp-0010",
+    "name": "Monadelphous",
+    "industry": "Engineering & Construction",
+    "location": "Perth / Brisbane, Australia",
+    "careersUrl": "https://www.monadelphous.com.au/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Monadelphous covering Engineering & Construction opportunities."
+  },
+  {
+    "companyId": "comp-0011",
+    "name": "Commonwealth Bank (CBA)",
+    "industry": "Banking & Financial Services",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.commbank.com.au/about-us/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Commonwealth Bank (CBA) covering Banking & Financial Services opportunities."
+  },
+  {
+    "companyId": "comp-0012",
+    "name": "ANZ Banking Group",
+    "industry": "Banking & Financial Services",
+    "location": "Melbourne, VIC, Australia",
+    "careersUrl": "https://www.anz.com.au/about-us/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for ANZ Banking Group covering Banking & Financial Services opportunities."
+  },
+  {
+    "companyId": "comp-0013",
+    "name": "National Australia Bank (NAB)",
+    "industry": "Banking & Financial Services",
+    "location": "Melbourne, VIC, Australia",
+    "careersUrl": "https://www.nab.com.au/about-us/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for National Australia Bank (NAB) covering Banking & Financial Services opportunities."
+  },
+  {
+    "companyId": "comp-0014",
+    "name": "Westpac Group",
+    "industry": "Banking & Financial Services",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.westpac.com.au/about-westpac/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Westpac Group covering Banking & Financial Services opportunities."
+  },
+  {
+    "companyId": "comp-0015",
+    "name": "Macquarie Group",
+    "industry": "Investment Banking & Asset Management",
+    "location": "Sydney / Global",
+    "careersUrl": "https://www.macquarie.com/au/en/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Macquarie Group covering Investment Banking & Asset Management opportunities."
+  },
+  {
+    "companyId": "comp-0016",
+    "name": "KPMG Australia",
+    "industry": "Management Consulting & Advisory",
+    "location": "Sydney / Melbourne / Perth",
+    "careersUrl": "https://kpmg.com/au/en/home/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for KPMG Australia covering Management Consulting & Advisory opportunities."
+  },
+  {
+    "companyId": "comp-0017",
+    "name": "Deloitte Australia",
+    "industry": "Professional Services & Consulting",
+    "location": "Sydney / Melbourne / Brisbane",
+    "careersUrl": "https://www2.deloitte.com/au/en/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Deloitte Australia covering Professional Services & Consulting opportunities."
+  },
+  {
+    "companyId": "comp-0018",
+    "name": "PwC Australia",
+    "industry": "Professional Services & Consulting",
+    "location": "Sydney / Melbourne, Australia",
+    "careersUrl": "https://www.pwc.com.au/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for PwC Australia covering Professional Services & Consulting opportunities."
+  },
+  {
+    "companyId": "comp-0019",
+    "name": "EY (Ernst & Young)",
+    "industry": "Advisory & Assurance",
+    "location": "Sydney / Melbourne / Perth",
+    "careersUrl": "https://www.ey.com/en_au/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for EY (Ernst & Young) covering Advisory & Assurance opportunities."
+  },
+  {
+    "companyId": "comp-0020",
+    "name": "Boston Consulting Group (BCG)",
+    "industry": "Strategy Consulting",
+    "location": "Sydney / Melbourne / Canberra",
+    "careersUrl": "https://www.bcg.com/en-au/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Boston Consulting Group (BCG) covering Strategy Consulting opportunities."
+  },
+  {
+    "companyId": "comp-0021",
+    "name": "Atlassian",
+    "industry": "Software & Collaboration",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.atlassian.com/company/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Atlassian covering Software & Collaboration opportunities."
+  },
+  {
+    "companyId": "comp-0022",
+    "name": "Canva",
+    "industry": "Design & AI Software",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.lifeatcanva.com/en/jobs/",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Canva covering Design & AI Software opportunities."
+  },
+  {
+    "companyId": "comp-0023",
+    "name": "SafetyCulture",
+    "industry": "Operations & Workplace Tech",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://safetyculture.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for SafetyCulture covering Operations & Workplace Tech opportunities."
+  },
+  {
+    "companyId": "comp-0024",
+    "name": "Culture Amp",
+    "industry": "HR & Employee Analytics",
+    "location": "Melbourne, VIC, Australia",
+    "careersUrl": "https://www.cultureamp.com/about/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Culture Amp covering HR & Employee Analytics opportunities."
+  },
+  {
+    "companyId": "comp-0025",
+    "name": "Employment Hero",
+    "industry": "HR & Payroll Software",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://employmenthero.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Employment Hero covering HR & Payroll Software opportunities."
+  },
+  {
+    "companyId": "comp-0026",
+    "name": "Airwallex",
+    "industry": "Fintech & Payments",
+    "location": "Melbourne / Sydney / Global",
+    "careersUrl": "https://www.airwallex.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Airwallex covering Fintech & Payments opportunities."
+  },
+  {
+    "companyId": "comp-0027",
+    "name": "Immutable",
+    "industry": "Web3 & Gaming Infrastructure",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.immutable.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Immutable covering Web3 & Gaming Infrastructure opportunities."
+  },
+  {
+    "companyId": "comp-0028",
+    "name": "Stripe",
+    "industry": "Financial Infrastructure & Payments",
+    "location": "Melbourne / Sydney / Remote",
+    "careersUrl": "https://stripe.com/jobs",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Stripe covering Financial Infrastructure & Payments opportunities."
+  },
+  {
+    "companyId": "comp-0029",
+    "name": "Figma",
+    "industry": "Design & Collaboration",
+    "location": "Sydney / Remote",
+    "careersUrl": "https://boards.greenhouse.io/figma",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "greenhouse",
+      "priority": [
+        "greenhouse",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Figma covering Design & Collaboration opportunities."
+  },
+  {
+    "companyId": "comp-0030",
+    "name": "Linear",
+    "industry": "Software Project Management",
+    "location": "Remote / Global",
+    "careersUrl": "https://api.ashbyhq.com/posting-api/job-board/linear",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "ashby",
+      "priority": [
+        "ashby",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Linear covering Software Project Management opportunities."
+  },
+  {
+    "companyId": "comp-0031",
+    "name": "Spotify",
+    "industry": "Audio & Media Tech",
+    "location": "Sydney / Global",
+    "careersUrl": "https://jobs.lever.co/spotify",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "lever",
+      "priority": [
+        "lever",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Spotify covering Audio & Media Tech opportunities."
+  },
+  {
+    "companyId": "comp-0032",
+    "name": "Amazon Web Services (AWS)",
+    "industry": "Cloud & AI Infrastructure",
+    "location": "Sydney / Melbourne / Perth",
+    "careersUrl": "https://www.amazon.jobs/en/teams/aws",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Amazon Web Services (AWS) covering Cloud & AI Infrastructure opportunities."
+  },
+  {
+    "companyId": "comp-0033",
+    "name": "Google Australia",
+    "industry": "Technology & AI",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://careers.google.com",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Google Australia covering Technology & AI opportunities."
+  },
+  {
+    "companyId": "comp-0034",
+    "name": "Microsoft Australia",
+    "industry": "Enterprise Software & Cloud",
+    "location": "Sydney / Melbourne, Australia",
+    "careersUrl": "https://careers.microsoft.com",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Microsoft Australia covering Enterprise Software & Cloud opportunities."
+  },
+  {
+    "companyId": "comp-0035",
+    "name": "Qantas Airways",
+    "industry": "Aviation & Aerospace",
+    "location": "Sydney / Melbourne / Brisbane",
+    "careersUrl": "https://www.qantas.com/au/en/about-us/our-company/careers.html",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Qantas Airways covering Aviation & Aerospace opportunities."
+  },
+  {
+    "companyId": "comp-0036",
+    "name": "Virgin Australia",
+    "industry": "Aviation",
+    "location": "Brisbane / Sydney, Australia",
+    "careersUrl": "https://www.virginaustralia.com/au/en/about-us/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Virgin Australia covering Aviation opportunities."
+  },
+  {
+    "companyId": "comp-0037",
+    "name": "Toll Group",
+    "industry": "Logistics & Supply Chain",
+    "location": "Melbourne / Global",
+    "careersUrl": "https://www.tollgroup.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Toll Group covering Logistics & Supply Chain opportunities."
+  },
+  {
+    "companyId": "comp-0038",
+    "name": "Linfox",
+    "industry": "Logistics & Supply Chain",
+    "location": "Melbourne / National",
+    "careersUrl": "https://www.linfox.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Linfox covering Logistics & Supply Chain opportunities."
+  },
+  {
+    "companyId": "comp-0039",
+    "name": "Aurizon",
+    "industry": "Rail Freight & Transport",
+    "location": "Brisbane, QLD, Australia",
+    "careersUrl": "https://www.aurizon.com.au/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Aurizon covering Rail Freight & Transport opportunities."
+  },
+  {
+    "companyId": "comp-0040",
+    "name": "Australia Post",
+    "industry": "Logistics & Postal Services",
+    "location": "Melbourne / National",
+    "careersUrl": "https://auspost.com.au/about-us/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Australia Post covering Logistics & Postal Services opportunities."
+  },
+  {
+    "companyId": "comp-0041",
+    "name": "CSL Limited",
+    "industry": "Biopharmaceuticals",
+    "location": "Melbourne, VIC, Australia",
+    "careersUrl": "https://www.csl.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for CSL Limited covering Biopharmaceuticals opportunities."
+  },
+  {
+    "companyId": "comp-0042",
+    "name": "Ramsay Health Care",
+    "industry": "Healthcare Services",
+    "location": "Sydney / National",
+    "careersUrl": "https://www.ramsayhealth.com.au/Careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Ramsay Health Care covering Healthcare Services opportunities."
+  },
+  {
+    "companyId": "comp-0043",
+    "name": "Sonic Healthcare",
+    "industry": "Medical Diagnostics",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.sonichealthcare.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Sonic Healthcare covering Medical Diagnostics opportunities."
+  },
+  {
+    "companyId": "comp-0044",
+    "name": "CIMIC Group (CPB Contractors)",
+    "industry": "Construction & Infrastructure",
+    "location": "Sydney / National",
+    "careersUrl": "https://www.cimic.com.au/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for CIMIC Group (CPB Contractors) covering Construction & Infrastructure opportunities."
+  },
+  {
+    "companyId": "comp-0045",
+    "name": "Lendlease",
+    "industry": "Real Estate & Construction",
+    "location": "Sydney, NSW, Australia",
+    "careersUrl": "https://www.lendlease.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Lendlease covering Real Estate & Construction opportunities."
+  },
+  {
+    "companyId": "comp-0046",
+    "name": "Downer Group",
+    "industry": "Infrastructure & Transport",
+    "location": "Sydney / National",
+    "careersUrl": "https://www.downergroup.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Downer Group covering Infrastructure & Transport opportunities."
+  },
+  {
+    "companyId": "comp-0047",
+    "name": "Ventia",
+    "industry": "Essential Infrastructure Services",
+    "location": "Sydney / Perth / National",
+    "careersUrl": "https://www.ventia.com/careers",
+    "size": "1000-5000+",
+    "connector": {
+      "type": "crawl4ai",
+      "priority": [
+        "crawl4ai",
+        "crawl4ai"
+      ]
+    },
+    "verified": true,
+    "followerCount": 0,
+    "description": "Official enterprise careers portal for Ventia covering Essential Infrastructure Services opportunities."
+  }
+]

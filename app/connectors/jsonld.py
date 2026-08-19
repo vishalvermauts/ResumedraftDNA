@@ -54,6 +54,15 @@ class JsonLdConnector(BaseConnector):
 
                 h = canonical_hash("jsonld", str(job_id), self.company_name or "", title, loc_raw, apply_url)
 
+                deadline_raw = entry.get("validThrough")
+                deadline = None
+                if deadline_raw:
+                    try:
+                        from datetime import datetime
+                        deadline = datetime.fromisoformat(str(deadline_raw).replace('Z', '+00:00'))
+                    except Exception:
+                        deadline = None
+
                 jobs.append(JobPosting(
                     canonicalHash=h,
                     source="jsonld",
@@ -63,6 +72,7 @@ class JsonLdConnector(BaseConnector):
                     location=[Location(raw=loc_raw)],
                     descriptionText=description,
                     applyUrl=apply_url,
-                    canonicalUrl=apply_url
+                    canonicalUrl=apply_url,
+                    applicationDeadline=deadline
                 ))
         return jobs

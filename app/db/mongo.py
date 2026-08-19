@@ -16,7 +16,11 @@ class Database:
         self.client.close()
     
     async def upsert_job(self, job_data):
-        # Canonical upsert
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        job_data["lastSeenAt"] = now
+        job_data["missedPolls"] = 0
+        job_data["status"] = "active"
         return await self.db.job_postings.update_one(
             {"canonicalHash": job_data["canonicalHash"]},
             {"$set": job_data},

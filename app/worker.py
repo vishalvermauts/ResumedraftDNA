@@ -393,13 +393,14 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             except Exception as fs_job_err:
                 print(f"Automation: Failed to sync job to user Firestore collection: {fs_job_err}")
 
-    # 1) Real scraped data first: match the shared corpus built by Watchlist connectors.
-    #    Restricted to the selected sources when the user has narrowed them (each corpus doc's
-    #    own `source` field is the connector that originally found it -- "greenhouse", "lever",
-    #    "jsonld", "ashby", "recruitee", "smartrecruiters", or "adzuna").
-    title_query = {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]}
+    title_query = {
+        "$and": [
+            {"$or": [{"title": {"$regex": re.escape(t), "$options": "i"}} for t in titles]},
+            {"status": {"$ne": "expired"}}
+        ]
+    }
     if sources:
-        title_query = {"$and": [title_query, {"source": {"$in": sources}}]}
+        title_query["$and"].append({"source": {"$in": sources}})
     corpus_matches = loop.run_until_complete(db.db.job_postings.find(title_query).to_list(length=30))
     for job in corpus_matches:
         # Extract location parsing dynamically to handle nested dicts and list structures
