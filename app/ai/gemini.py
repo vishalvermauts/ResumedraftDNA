@@ -75,19 +75,6 @@ class GeminiClient:
         return schema.model_validate_json(response.text)
 
     async def generate_grounded(self, prompt: str, feature: str = "search_grounding") -> str:
-        """Gemini + Google Search grounding. Quota-guarded to stop at 4,800/5,000 queries."""
-        if os.getenv("ENABLE_GEMINI_GROUNDING", "false").lower() != "true":
-            raise RuntimeError("Gemini grounding is disabled by ENABLE_GEMINI_GROUNDING")
-        labels = {"feature": feature, "app": "resumedraft"}
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-                labels=labels,
-            )
-        )
-        return response.text
+        raise RuntimeError("Gemini grounding is permanently disabled")
 
 gemini_client = GeminiClient()
-

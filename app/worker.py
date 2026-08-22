@@ -16,8 +16,6 @@ from .connectors.base import (
     ConnectorBackoffError,
 )
 from .connectors.adzuna import search_by_keywords as adzuna_search_by_keywords
-from .ai.gemini import gemini_client
-from .ai.quota import grounding_quota_available, record_grounding_usage
 import asyncio
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -454,44 +452,9 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 description=job.descriptionText, url=job.applyUrl, source="adzuna",
             )
 
-    # 3) Web-wide fallback via Gemini + Search grounding, quota-guarded.
-    if os.getenv("ENABLE_GEMINI_GROUNDING", "false").lower() == "true" and source_allowed("ai_search"):
-        if not loop.run_until_complete(grounding_quota_available()):
-            print("Automation: grounding quota exhausted this month, skipping AI search fallback")
-        else:
-            remote_clause = "Remote positions only. " if s.get("remoteOnly") else ""
-            visa_clause = "Only include postings that explicitly mention visa sponsorship is available. " if visa_only else ""
-            prompt = f"""Search for current open job postings matching: {' or '.join(titles)}, in {' or '.join(locations)}.
-{remote_clause}{visa_clause}Return ONLY a raw JSON array, no markdown fences, no prose. Max 10 results.
-Each item: {{"title": str, "company": str, "applyUrl": str, "location": str, "description": str}}. If none found, return []."""
-            try:
-                text = loop.run_until_complete(gemini_client.generate_grounded(prompt))
-                loop.run_until_complete(record_grounding_usage())
-                listings = _parse_grounded_json(text)
-            except Exception as e:
-                print(f"Automation: AI search failed for {uid}: {e}")
-                listings = []
-
-            for item in listings:
-                if not isinstance(item, dict):
-                    continue
-                apply_url = item.get("applyUrl")
-                title = item.get("title")
-                if not apply_url or not title:
-                    continue
-
-                upgraded = _upgrade_via_known_ats(apply_url, loop)
-                if upgraded:
-                    _save_job(
-                        title=upgraded.title, company=upgraded.companyName,
-                        location=upgraded.location[0].raw if upgraded.location else "",
-                        description=upgraded.descriptionText, url=upgraded.applyUrl, source=upgraded.source,
-                    )
-                else:
-                    _save_job(
-                        title=title, company=item.get("company", ""), location=item.get("location", ""),
-                        description=item.get("description", ""), url=apply_url, source="ai_search",
-                    )
+    # 3) Gemini + Search grounding is permanently disabled.
+    if source_allowed("ai_search"):
+        print(f"Automation: ai_search source is disabled for uid={uid}; skipping web-wide fallback")
 
     loop.run_until_complete(
         db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})

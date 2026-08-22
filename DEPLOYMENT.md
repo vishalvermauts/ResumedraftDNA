@@ -136,23 +136,12 @@ sudo docker compose up -d --build
 
 ---
 
-## 7. Gemini API & Search Grounding Safeguards
+## 7. Gemini API Safeguards
 
-If you decide to re-enable the Google Search Grounding features (`ai_search` connector) in the future, adhere to the following safety precautions to prevent runaway billing spikes:
+Google Search Grounding is permanently disabled in this codebase. Do not re-enable the `ai_search` connector or the grounded Gemini code path.
 
-### Cost Vulnerabilities
-* **No Free Tier**: Google AI Studio bills search grounding at **$0.01 per query** from the first request on pay-as-you-go keys.
-* **Celery Retry Loop Risk**: If the Celery background tasks (`personalized_discovery_task` or `discover_jobs_task`) fail at database write/commit stages (e.g. MongoDB or Redis connection lost), they can enter an infinite retrying loop. If Gemini is called *before* the task database state commit, each retry makes a new paid search grounding call.
-
-### Troubleshooting & verification steps (before re-enabling):
-1. **Check Redis & DB Health**: Always verify that Redis and MongoDB are running and responsive on the server:
-   ```bash
-   sudo docker compose exec redis redis-cli ping
-   ```
-   If Redis is down, **do not enable search grounding**. Bypassed budget limits will allow infinite calls.
-2. **Local Testing First**: Test the liveness check to ensure grounding acts correctly and counts queries properly:
-   ```bash
-   pytest tests/test_gemini_model_liveness.py -k test_gemini_model_liveness
-   ```
-3. **Verify Count Collection**: Check that query increments are recorded in MongoDB's `api_usage_counters` collection. If the collection fails to record updates, do not activate the feature.
-4. **Hard limit enforcement**: In `app/ai/quota.py`, verify `FREE_TIER_MONTHLY_LIMIT` is set to a low, safe threshold (e.g., `100` instead of `4500`) to protect against unexpected spikes during initial runs.
+### Required controls
+* Keep `ENABLE_GEMINI_GROUNDING=false` in every environment, even though the current code no longer depends on it.
+* Do not add live or paid grounding tests to CI.
+* If you need job discovery expansion, use the ATS connectors and JSON-LD paths only.
+* Any AI cost spikes must be investigated through standard Gemini usage, not search grounding.
