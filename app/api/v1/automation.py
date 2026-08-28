@@ -70,5 +70,19 @@ async def run_automation_now(setting_id: str, user: dict = Depends(get_current_u
     scheduled run. Follows the same fire-and-forget Celery dispatch pattern as
     POST /scout/watchlist."""
     await _find_owned(setting_id, user["uid"])
+    now = datetime.utcnow()
+    await db.db.automation_settings.update_one(
+        {"_id": ObjectId(setting_id)},
+        {"$set": {"lastRunAt": now, "updatedAt": now}}
+    )
+    try:
+        from firebase_admin import firestore
+        fs = firestore.client()
+        fs.collection("automation_settings").document(setting_id).set({
+            "lastRunAt": now.isoformat(),
+            "updatedAt": now.isoformat(),
+        }, merge=True)
+    except Exception as sync_err:
+        print(f"Automation: Failed to sync run-now timestamp to Firestore for {setting_id}: {sync_err}")
     run_single_automation_task.delay(setting_id)
-    return {"status": "started"}
+    return {"status": "started", "lastRunAt": now.isoformat()}

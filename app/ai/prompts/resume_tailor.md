@@ -39,7 +39,7 @@ You **MUST** mirror the exact organizational hierarchy and domain vocabulary of 
 
 | Candidate Master Experience Phrase | Target Industry: Corporate / Professional Services (e.g., Big 4, Legal, Banking) | Target Industry: Tech / SaaS / Agentic AI | Target Industry: Heavy Resources / Mining / Offshore | Target Industry: Non-Profit / Community / Education |
 | :--- | :--- | :--- | :--- | :--- |
-| **Senior Management / Town Management** | `Partners, GEO Leads & Executive Directors` | `Engineering Directors & Product Leads` | `Offshore Installation Managers (OIM) & Superintendents` | `Board Members & Program Directors` |
+| **Senior Management / Town Management** | Translate domain vocabulary in bullets only. NEVER replace, promote, or rewrite a source job title, employer, or employment date. |
 | **End-of-Day Progress Reports (DPR)** | `Executive Briefing Packs & KPI Reporting` | `Sprint Progress Metrics & Status Telemetry` | `Daily Progress Reporting (DPR) & Downtime Logs` | `Community Impact Logs & Stakeholder Updates` |
 | **Timesheets & Service Entries (SEs)** | `Expense Reconciliations, Invoicing & Billing` | `Contractor Hours & Budget Allocations` | `SAP Service Entries & Timesheets` | `Grant Expenditure & Volunteer Time Tracking` |
 | **ERP Software / Database Systems** | `Enterprise ERP (SAP, Oracle) & Microsoft 365` | `Database Systems, SQL & API Integrations` | `SAP PM/MM & Rig Management Systems` | `Member Management & CRM Databases` |

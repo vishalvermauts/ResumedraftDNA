@@ -2,7 +2,9 @@ import os
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27018/resumedraft_test")
+# Use the local compose Mongo port by default; CI can still override this with
+# MONGODB_URI when it provides an isolated test database.
+os.environ.setdefault("MONGODB_URI", "mongodb://localhost:27017/resumedraft_test")
 
 from app.main import app
 from app.auth import get_current_user

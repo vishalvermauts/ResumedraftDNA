@@ -26,20 +26,33 @@ def _get_auth_client():
     if use_vertex:
         project = os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")
         location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
-        # 1. Try local gcloud token with StaticTokenCredentials
-        try:
-            token = subprocess.check_output("gcloud auth print-access-token", shell=True).decode().strip()
-            if token.startswith("ya29."):
-                creds = StaticTokenCredentials(token)
-                return genai.Client(vertexai=True, project=project, location=location, credentials=creds)
-        except Exception:
-            pass
 
-        # 2. Try default ADC (works in Google Cloud environments)
+        # Local certification can inject a short-lived gcloud access token without
+        # storing a private key in the repository. Production continues to use ADC.
+        access_token = os.getenv("VERTEX_ACCESS_TOKEN")
+        if access_token:
+            return genai.Client(
+                vertexai=True,
+                project=project,
+                location=location,
+                credentials=StaticTokenCredentials(access_token),
+            )
+
+        # 1. Try default ADC / workload identity / service-account-based auth first.
         try:
             return genai.Client(vertexai=True, project=project, location=location)
         except Exception:
             pass
+
+        # 2. Try local gcloud token only for interactive developer sessions.
+        if os.getenv("CI", "").lower() not in ("true", "1", "yes"):
+            try:
+                token = subprocess.check_output("gcloud auth print-access-token", shell=True).decode().strip()
+                if token.startswith("ya29."):
+                    creds = StaticTokenCredentials(token)
+                    return genai.Client(vertexai=True, project=project, location=location, credentials=creds)
+            except Exception:
+                pass
 
         return genai.Client(vertexai=True, project=project, location=location)
 
@@ -59,13 +72,15 @@ class GeminiClient:
         feature: str = "resume_tailor",
         thinking_level: str = "low"
     ) -> BaseModel:
-        labels = {"feature": feature, "app": "resumedraft"}
         config_kwargs = {
             "system_instruction": system,
             "response_mime_type": "application/json",
             "response_schema": schema,
-            "labels": labels,
         }
+        # Gemini Developer API rejects Vertex Agent Platform-only labels.
+        # Keep labels only when the local/production client is explicitly Vertex-backed.
+        if os.getenv("USE_VERTEX_AI", "true").lower() == "true":
+            config_kwargs["labels"] = {"feature": feature, "app": "resumedraft"}
         
         response = await self.client.aio.models.generate_content(
             model=self.model,

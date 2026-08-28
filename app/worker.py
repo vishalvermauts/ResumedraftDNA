@@ -16,6 +16,7 @@ from .connectors.base import (
     ConnectorBackoffError,
 )
 from .connectors.adzuna import search_by_keywords as adzuna_search_by_keywords
+from .connectors.amazonjobs import search_by_keywords as amazonjobs_search_by_keywords
 import asyncio
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -339,7 +340,11 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 loc_lower = str(location).lower()
                 for c_name in target_countries:
                     # Match 'australia' or country abbreviation 'au'
-                    if c_name in loc_lower or (c_name == "australia" and (" au" in loc_lower or ", au" in loc_lower or loc_lower == "au")):
+                    if c_name in loc_lower or (c_name == "australia" and (
+                        " au" in loc_lower or ", au" in loc_lower or " aus" in loc_lower
+                        or ", aus" in loc_lower or loc_lower in ("au", "aus")
+                        or any(state in loc_lower for state in ("nsw", "vic", "qld", "wa", "sa", "tas", "act", "nt"))
+                    )):
                         matched_loc = True
                         break
             
@@ -452,6 +457,25 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 description=job.descriptionText, url=job.applyUrl, source="adzuna",
             )
 
+    # Amazon.jobs direct keyword search for company pages and exact-role checks.
+    if source_allowed("amazonjobs"):
+        try:
+            amazon_jobs = loop.run_until_complete(
+                amazonjobs_search_by_keywords(titles, locations=locations, max_results=10)
+            )
+        except (ConnectorError, ConnectorBackoffError) as e:
+            print(f"Automation: Amazon.jobs search failed for {uid}: {e}")
+            amazon_jobs = []
+        for job in amazon_jobs:
+            _save_job(
+                title=job.title,
+                company=job.companyName,
+                location=job.location[0].raw if job.location else "",
+                description=job.descriptionText,
+                url=job.applyUrl,
+                source="amazonjobs",
+            )
+
     # 3) Gemini + Search grounding is permanently disabled.
     if source_allowed("ai_search"):
         print(f"Automation: ai_search source is disabled for uid={uid}; skipping web-wide fallback")
@@ -463,7 +487,8 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
     try:
         firestore_id = s.get("firestoreId") or str(s["_id"])
         fs.collection("automation_settings").document(firestore_id).update({
-            "lastRun": now.isoformat()
+            "lastRunAt": now.isoformat(),
+            "updatedAt": now.isoformat()
         })
     except Exception as fs_err:
         print(f"Automation: Failed to sync lastRun back to Firestore for settings {s.get('_id')}: {fs_err}")
