@@ -49,7 +49,16 @@ def _preserve_source_identity(source: dict, generated: dict | None):
     if source_jobs:
         jobs = []
         for index, original in enumerate(source_jobs):
-            candidate = generated_jobs[index] if index < len(generated_jobs) else {}
+            candidate = next((item for item in generated_jobs
+                              if isinstance(item, dict) and original.get("id")
+                              and item.get("id") == original.get("id")), None)
+            if candidate is None:
+                candidate = next((item for item in generated_jobs
+                                  if isinstance(item, dict)
+                                  and item.get("company") == original.get("company")
+                                  and item.get("jobTitle") == original.get("jobTitle")), None)
+            if candidate is None:
+                candidate = generated_jobs[index] if index < len(generated_jobs) else {}
             candidate = candidate if isinstance(candidate, dict) else {}
             merged = dict(original)
             if isinstance(candidate.get("bulletPoints"), list) and candidate["bulletPoints"]:
@@ -64,7 +73,15 @@ def _preserve_source_identity(source: dict, generated: dict | None):
     if source_projects:
         projects = []
         for index, original in enumerate(source_projects):
-            candidate = generated_projects[index] if index < len(generated_projects) else {}
+            candidate = next((item for item in generated_projects
+                              if isinstance(item, dict) and original.get("id")
+                              and item.get("id") == original.get("id")), None)
+            if candidate is None:
+                candidate = next((item for item in generated_projects
+                                  if isinstance(item, dict)
+                                  and item.get("name") == original.get("name")), None)
+            if candidate is None:
+                candidate = generated_projects[index] if index < len(generated_projects) else {}
             candidate = candidate if isinstance(candidate, dict) else {}
             merged = dict(original)
             if isinstance(candidate.get("description"), list) and candidate["description"]:
