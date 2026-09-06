@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
 serviceAccountKey.json
+resumedraft-vertex-key.json
+celerybeat-schedule
 .env
 .env.test.local
