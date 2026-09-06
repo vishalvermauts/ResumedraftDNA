@@ -167,6 +167,15 @@ def test_master_snapshot_has_stable_hash_and_provenance():
     assert first["metadata"]["parseStatus"] == "validated"
 
 
+def test_source_backed_sections_reject_untraceable_records():
+    from app.ai.validation import ArtifactValidationError, validate_source_backed_sections
+
+    with pytest.raises(ArtifactValidationError):
+        validate_source_backed_sections({
+            "projects": [{"name": "Invented project", "description": ["unsupported claim"]}]
+        })
+
+
 async def test_tailor_requires_auth(client):
     from app.main import app
     from app.auth import get_current_user

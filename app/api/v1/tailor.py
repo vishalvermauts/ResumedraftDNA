@@ -6,7 +6,12 @@ from ...schemas.artifact import TailoredArtifact
 from datetime import datetime
 from pydantic import BaseModel
 from ...ai.hybrid_tailor import analyze_resume, build_hybrid_prompt
-from ...ai.validation import ArtifactValidationError, validate_cover_letter, validate_protected_facts
+from ...ai.validation import (
+    ArtifactValidationError,
+    validate_cover_letter,
+    validate_protected_facts,
+    validate_source_backed_sections,
+)
 from ...ai.master_snapshot import add_source_provenance
 from firebase_admin import firestore
 import re
@@ -395,6 +400,7 @@ async def tailor_resume(
     try:
         if tailored_resume:
             validate_protected_facts(source_resume, tailored_resume)
+            validate_source_backed_sections(tailored_resume)
         if type == "coverLetter":
             validate_cover_letter(cover_letter)
     except ArtifactValidationError as exc:

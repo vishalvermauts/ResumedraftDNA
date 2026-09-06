@@ -65,3 +65,23 @@ def validate_cover_letter(text: str | None, minimum: int = 250, maximum: int = 3
         raise ArtifactValidationError(
             f"Cover letter must contain {minimum}-{maximum} words; received {words}"
         )
+
+
+def validate_source_backed_sections(generated: dict[str, Any]) -> None:
+    """Require selected structured records to retain their master evidence IDs.
+
+    Narrative bullets are allowed to be paraphrased, but they must remain
+    inside a record carrying source evidence. This is compatible with the
+    existing public payload while preventing untraceable records from being
+    persisted.
+    """
+    for section in (
+        "employmentHistory", "education", "projects", "certifications",
+        "leadershipVolunteering", "technicalSkills", "skills",
+    ):
+        for index, item in enumerate(_items(generated.get(section)), 1):
+            evidence = item.get("sourceEvidenceIds")
+            if not isinstance(evidence, list) or not any(isinstance(x, str) and x for x in evidence):
+                raise ArtifactValidationError(
+                    f"{section}[{index}] is missing source evidence IDs"
+                )
