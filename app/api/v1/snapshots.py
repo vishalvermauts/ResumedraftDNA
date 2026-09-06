@@ -17,13 +17,8 @@ async def create_resume_snapshot(
     structured_data = add_source_provenance(snapshot.structuredData)
     snapshot_hash = snapshot.contentHash or structured_data["metadata"]["contentHash"]
     source_file_hash = snapshot.sourceFileHash or structured_data.get("metadata", {}).get("sourceFileHash")
-    # 1. Unset all existing active snapshots
-    await db.db.resume_snapshots.update_many(
-        {"uid": user["uid"], "active": True},
-        {"$set": {"active": False}}
-    )
-
-    # 2. Create content hash
+    # A content hash is the immutable identity of a snapshot.  If it already
+    # exists, never replace its source data or timestamps; only select it.
     snapshot_doc = {
         "uid": user["uid"],
         "firestoreResumeId": snapshot.firestoreResumeId,
@@ -33,14 +28,24 @@ async def create_resume_snapshot(
         "sourceTextHash": snapshot.sourceTextHash,
         "schemaVersion": snapshot.schemaVersion,
         "structuredData": structured_data,
-        "active": True,
+        "active": False,
         "createdAt": datetime.utcnow()
     }
-    
-    result = await db.db.resume_snapshots.update_one(
+    existing = await db.db.resume_snapshots.find_one(
+        {"uid": user["uid"], "contentHash": snapshot_hash}
+    )
+    if not existing:
+        await db.db.resume_snapshots.insert_one(snapshot_doc)
+
+    # Select only after the replacement is known to exist.  This avoids
+    # leaving a user without a master when an invalid write is submitted.
+    await db.db.resume_snapshots.update_many(
+        {"uid": user["uid"], "active": True, "contentHash": {"$ne": snapshot_hash}},
+        {"$set": {"active": False}}
+    )
+    await db.db.resume_snapshots.update_one(
         {"uid": user["uid"], "contentHash": snapshot_hash},
-        {"$set": snapshot_doc},
-        upsert=True,
+        {"$set": {"active": True}}
     )
     record = await db.db.resume_snapshots.find_one({"uid": user["uid"], "contentHash": snapshot_hash})
     return {"status": "success", "id": str(record["_id"]), "contentHash": snapshot_hash}
@@ -50,16 +55,10 @@ async def set_master_resume(
     firestore_resume_id: str,
     user: dict = Depends(get_current_user)
 ):
-    # 1. Unset all existing active snapshots for this user
-    await db.db.resume_snapshots.update_many(
-        {"uid": user["uid"], "active": True},
-        {"$set": {"active": False}}
-    )
-    
-    # 2. Set new master resume as active (lookup by firestoreResumeId)
+    # Resolve the target before changing the active snapshot.
     result = await db.db.resume_snapshots.update_one(
         {"uid": user["uid"], "firestoreResumeId": firestore_resume_id},
-        {"$set": {"active": True}}
+        {"$set": {"active": False}}
     )
     
     # If the snapshot doesn't exist yet in Mongo, pull it dynamically from Firestore and seed it
@@ -95,6 +94,15 @@ async def set_master_resume(
             "createdAt": datetime.utcnow()
         }
         await db.db.resume_snapshots.insert_one(snapshot_doc)
+
+    await db.db.resume_snapshots.update_many(
+        {"uid": user["uid"], "active": True},
+        {"$set": {"active": False}}
+    )
+    await db.db.resume_snapshots.update_one(
+        {"uid": user["uid"], "firestoreResumeId": firestore_resume_id},
+        {"$set": {"active": True}}
+    )
         
     return {"status": "success"}
 
