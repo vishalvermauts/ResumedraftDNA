@@ -72,12 +72,14 @@ class GeminiClient:
         user: str,
         schema: type[BaseModel],
         feature: str = "resume_tailor",
-        thinking_level: str = "low"
+        thinking_level: str = "low",
+        max_output_tokens: int = 8192
     ) -> BaseModel:
         config_kwargs = {
             "system_instruction": system,
             "response_mime_type": "application/json",
             "response_schema": schema,
+            "max_output_tokens": max_output_tokens,
         }
         # Gemini Developer API rejects Vertex Agent Platform-only labels.
         # Keep labels only when the local/production client is explicitly Vertex-backed.
@@ -92,6 +94,12 @@ class GeminiClient:
                     contents=user,
                     config=types.GenerateContentConfig(**config_kwargs)
                 )
+                candidate = (getattr(response, "candidates", None) or [None])[0]
+                finish_reason = getattr(candidate, "finish_reason", None)
+                if finish_reason is not None and str(finish_reason).upper().endswith("MAX_TOKENS"):
+                    raise ValueError("Vertex structured generation was truncated: MAX_TOKENS")
+                if not getattr(response, "text", None):
+                    raise ValueError("Vertex structured generation returned no text")
                 break
             except Exception as error:
                 last_error = error
