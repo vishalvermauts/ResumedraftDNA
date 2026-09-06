@@ -25,6 +25,7 @@ services:
       - GEMINI_MODEL=gemini-2.5-flash
       - ENABLE_GEMINI_GROUNDING=false
       - ALLOW_TAILOR_FALLBACK=false
+      - APP_VERSION=${APP_VERSION:-local}
   mongo:
     image: mongo:7.0
     ports:
@@ -57,6 +58,7 @@ services:
       - GEMINI_MODEL=gemini-2.5-flash
       - ENABLE_GEMINI_GROUNDING=false
       - ALLOW_TAILOR_FALLBACK=false
+      - APP_VERSION=${APP_VERSION:-local}
   beat:
     build: .
     command: celery -A app.worker beat --loglevel=info
@@ -80,6 +82,7 @@ services:
       - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
       - GEMINI_MODEL=gemini-2.5-flash
       - ENABLE_GEMINI_GROUNDING=false
+      - APP_VERSION=${APP_VERSION:-local}
 
 volumes:
   mongo_data:
