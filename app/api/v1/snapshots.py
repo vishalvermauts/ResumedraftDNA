@@ -3,8 +3,6 @@ from ...auth import get_current_user
 from ...db.mongo import db
 from ...schemas.snapshot import ResumeSnapshot
 from ...ai.master_snapshot import add_source_provenance, content_hash
-import hashlib
-import json
 from datetime import datetime
 
 router = APIRouter()
@@ -79,16 +77,17 @@ async def set_master_resume(
             raise HTTPException(status_code=404, detail="Resume not found in Firestore")
         
         res_data = res_doc.to_dict()
-        structured_data = res_data.get("data", {})
-        
-        content_str = json.dumps(structured_data, sort_keys=True)
-        content_hash = hashlib.sha256(content_str.encode()).hexdigest()
+        structured_data = add_source_provenance(res_data.get("data", {}), source_prefix="firestore")
+        snapshot_content_hash = structured_data["metadata"]["contentHash"]
         
         snapshot_doc = {
             "uid": user["uid"],
             "firestoreResumeId": firestore_resume_id,
             "version": 1,
-            "contentHash": content_hash,
+            "contentHash": snapshot_content_hash,
+            "sourceFileHash": structured_data.get("metadata", {}).get("sourceFileHash"),
+            "sourceTextHash": structured_data.get("metadata", {}).get("sourceTextHash"),
+            "schemaVersion": structured_data.get("metadata", {}).get("schemaVersion", "resume-v1"),
             "structuredData": structured_data,
             "active": True,
             "createdAt": datetime.utcnow()
