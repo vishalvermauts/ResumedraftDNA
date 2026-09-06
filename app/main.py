@@ -7,12 +7,19 @@ from .api.v1.watchlist import router as watchlist_router
 from .api.v1.tailor import router as tailor_router
 from .api.v1.automation import router as automation_router
 from .db.mongo import db
+import os
+
+configured_origins = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "https://resumedraft.vercel.app,https://resumedraft-git-beta-version-vishalvermauts-projects.vercel.app",
+)
+allowed_origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
 
 app = FastAPI(title="ResumeDraft DNA API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to your actual Vercel domain
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
