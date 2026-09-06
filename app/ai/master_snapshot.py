@@ -10,6 +10,7 @@ import hashlib
 import json
 from copy import deepcopy
 from typing import Any
+from .master_ingestion import section_chunks
 
 
 SNAPSHOT_SCHEMA_VERSION = "resume-v1"
@@ -53,6 +54,6 @@ def add_source_provenance(resume: dict[str, Any], source_prefix: str = "master")
     metadata["contentHash"] = content_hash({key: value for key, value in snapshot.items() if key != "metadata"})
     metadata["parseStatus"] = "validated"
     metadata["sectionCounts"] = counters
+    metadata["ingestionChunkIds"] = [chunk["chunkId"] for chunk in section_chunks(snapshot)]
     snapshot["metadata"] = metadata
     return snapshot
-
