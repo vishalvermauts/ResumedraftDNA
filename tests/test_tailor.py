@@ -63,8 +63,8 @@ async def test_tailor_cover_letter_type_is_sent_to_the_model(client):
     with patch("app.api.v1.tailor.gemini_client.generate_structured", new=AsyncMock(side_effect=capture_call)):
         resp = await client.post("/v1/tailor/job1?type=coverLetter", json={"description": "JD text"})
 
-    assert resp.status_code == 200
-    assert resp.json()["data"]["coverLetter"] == "Dear Hiring Manager,..."
+    assert resp.status_code == 422
+    assert "250-350" in resp.json()["detail"]
     assert "coverLetter" in captured["system"] or "cover letter" in captured["system"].lower()
 
 
@@ -138,6 +138,33 @@ def test_tailor_preserves_source_job_identity_and_sections():
     assert result["employmentHistory"][0]["company"] == "Dubai Petroleum"
     assert result["projects"][0]["name"] == "StructZero"
     assert result["education"] == source["education"]
+
+
+def test_protected_facts_reject_invented_employment_record():
+    from app.ai.validation import ArtifactValidationError, validate_protected_facts
+
+    source = {"employmentHistory": [{"company": "Dubai Petroleum", "jobTitle": "Rig Administrator"}]}
+    generated = {"employmentHistory": [{"company": "Invented Co", "jobTitle": "Senior Operations Manager"}]}
+    with pytest.raises(ArtifactValidationError):
+        validate_protected_facts(source, generated)
+
+
+def test_cover_letter_validation_rejects_short_output():
+    from app.ai.validation import ArtifactValidationError, validate_cover_letter
+
+    with pytest.raises(ArtifactValidationError):
+        validate_cover_letter("Too short")
+
+
+def test_master_snapshot_has_stable_hash_and_provenance():
+    from app.ai.master_snapshot import add_source_provenance
+
+    source = {"employmentHistory": [{"company": "Dubai Petroleum", "jobTitle": "Rig Administrator"}]}
+    first = add_source_provenance(source)
+    second = add_source_provenance(source)
+    assert first == second
+    assert first["employmentHistory"][0]["sourceEvidenceIds"] == ["master:employmentHistory:0001"]
+    assert first["metadata"]["parseStatus"] == "validated"
 
 
 async def test_tailor_requires_auth(client):

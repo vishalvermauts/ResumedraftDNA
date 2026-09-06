@@ -11,6 +11,20 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
+      - FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099
+      - FIRESTORE_EMULATOR_HOST=host.docker.internal:8085
+      - LOCAL_AUTH_BYPASS=true
+      - USE_VERTEX_AI=true
+      # Match the frontend Firebase emulator project so worker writes are visible
+      # to the browser during local certification runs.
+      - GOOGLE_CLOUD_PROJECT=ai-resume-builder-7f92x
+      - VERTEX_PROJECT_ID=ai-resume-builder-497820
+      - GOOGLE_CLOUD_LOCATION=global
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+      - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
+      - GEMINI_MODEL=gemini-2.5-flash
+      - ENABLE_GEMINI_GROUNDING=false
+      - ALLOW_TAILOR_FALLBACK=false
   mongo:
     image: mongo:7.0
     ports:
@@ -19,8 +33,6 @@ services:
       - mongo_data:/data/db
   redis:
     image: redis:7
-    ports:
-      - "6379:6379"
   worker:
     build: .
     command: celery -A app.worker worker --loglevel=info
@@ -33,6 +45,18 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
+      - FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099
+      - FIRESTORE_EMULATOR_HOST=host.docker.internal:8085
+      - LOCAL_AUTH_BYPASS=true
+      - USE_VERTEX_AI=true
+      - GOOGLE_CLOUD_PROJECT=ai-resume-builder-7f92x
+      - VERTEX_PROJECT_ID=ai-resume-builder-497820
+      - GOOGLE_CLOUD_LOCATION=global
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+      - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
+      - GEMINI_MODEL=gemini-2.5-flash
+      - ENABLE_GEMINI_GROUNDING=false
+      - ALLOW_TAILOR_FALLBACK=false
   beat:
     build: .
     command: celery -A app.worker beat --loglevel=info
@@ -45,6 +69,17 @@ services:
     environment:
       - MONGODB_URI=mongodb://mongo:27017/resumedraft
       - REDIS_URL=redis://redis:6379
+      - FIREBASE_AUTH_EMULATOR_HOST=host.docker.internal:9099
+      - FIRESTORE_EMULATOR_HOST=host.docker.internal:8085
+      - LOCAL_AUTH_BYPASS=true
+      - USE_VERTEX_AI=true
+      - GOOGLE_CLOUD_PROJECT=ai-resume-builder-7f92x
+      - VERTEX_PROJECT_ID=ai-resume-builder-497820
+      - GOOGLE_CLOUD_LOCATION=global
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
+      - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
+      - GEMINI_MODEL=gemini-2.5-flash
+      - ENABLE_GEMINI_GROUNDING=false
 
 volumes:
   mongo_data:

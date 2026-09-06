@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...auth import get_current_user
 from ...db.mongo import db
 from ...schemas.snapshot import ResumeSnapshot
+from ...ai.master_snapshot import add_source_provenance, content_hash
 import hashlib
 import json
 from datetime import datetime
@@ -13,6 +14,9 @@ async def create_resume_snapshot(
     snapshot: ResumeSnapshot,
     user: dict = Depends(get_current_user)
 ):
+    structured_data = add_source_provenance(snapshot.structuredData)
+    snapshot_hash = snapshot.contentHash or structured_data["metadata"]["contentHash"]
+    source_file_hash = snapshot.sourceFileHash or structured_data.get("metadata", {}).get("sourceFileHash")
     # 1. Unset all existing active snapshots
     await db.db.resume_snapshots.update_many(
         {"uid": user["uid"], "active": True},
@@ -20,21 +24,26 @@ async def create_resume_snapshot(
     )
 
     # 2. Create content hash
-    content_str = json.dumps(snapshot.structuredData, sort_keys=True)
-    content_hash = hashlib.sha256(content_str.encode()).hexdigest()
-    
     snapshot_doc = {
         "uid": user["uid"],
         "firestoreResumeId": snapshot.firestoreResumeId,
         "version": snapshot.version,
-        "contentHash": content_hash,
-        "structuredData": snapshot.structuredData,
+        "contentHash": snapshot_hash,
+        "sourceFileHash": source_file_hash,
+        "sourceTextHash": snapshot.sourceTextHash,
+        "schemaVersion": snapshot.schemaVersion,
+        "structuredData": structured_data,
         "active": True,
         "createdAt": datetime.utcnow()
     }
     
-    result = await db.db.resume_snapshots.insert_one(snapshot_doc)
-    return {"status": "success", "id": str(result.inserted_id)}
+    result = await db.db.resume_snapshots.update_one(
+        {"uid": user["uid"], "contentHash": snapshot_hash},
+        {"$set": snapshot_doc},
+        upsert=True,
+    )
+    record = await db.db.resume_snapshots.find_one({"uid": user["uid"], "contentHash": snapshot_hash})
+    return {"status": "success", "id": str(record["_id"]), "contentHash": snapshot_hash}
 
 @router.post("/resume-snapshots/set-master")
 async def set_master_resume(

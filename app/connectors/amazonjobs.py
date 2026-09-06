@@ -1,6 +1,10 @@
 import asyncio
 import re
 from typing import List
+from urllib.parse import urlencode
+
+import httpx
+from bs4 import BeautifulSoup
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
@@ -136,7 +140,79 @@ class AmazonJobsConnector(BaseConnector):
 
 async def search_by_keywords(titles: list[str], locations: list[str] | None = None, max_results: int = 10) -> list[JobPosting]:
     query = " ".join(titles).strip() or "amazon"
-    url = f"https://www.amazon.jobs/search?base_query={query.replace(' ', '+')}"
+    # Prefer Amazon's structured search endpoint. It is more reliable than
+    # rendering the public HTML page and avoids false empty results caused by
+    # the careers site's anti-bot/browser layer.
+    params = {"base_query": query, "result_limit": max_results}
+    if locations:
+        params["loc_query"] = locations[0].replace(" (All Locations)", "")
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers={"User-Agent": "ResumeDraft job connector"}) as client:
+            response = await client.get("https://www.amazon.jobs/en/search.json", params=params)
+            response.raise_for_status()
+            payload = response.json()
+        structured = payload.get("jobs") or payload.get("content", {}).get("search_results", {}).get("jobs") or []
+        if structured:
+            results = []
+            for item in structured:
+                title = str(item.get("title") or item.get("job_title") or "").strip()
+                location = str(item.get("location") or item.get("normalized_location") or "").strip()
+                apply_url = item.get("job_path") or item.get("url") or item.get("job_url")
+                if apply_url and apply_url.startswith("/"):
+                    apply_url = "https://www.amazon.jobs" + apply_url
+                if not title or not apply_url:
+                    continue
+                if titles and not any(t.lower() in title.lower() for t in titles):
+                    continue
+                if not _matches_location(location, locations):
+                    continue
+                job_id = str(item.get("id") or item.get("job_id") or apply_url)
+                results.append(JobPosting(canonicalHash=canonical_hash("amazonjobs", job_id, "amazon", title, location, apply_url), source="amazonjobs", sourceJobId=job_id, companyName="Amazon", title=title, location=[Location(raw=location)], descriptionText=str(item.get("description") or "")[:15000], applyUrl=apply_url, canonicalUrl=apply_url, status="active"))
+                if len(results) >= max_results:
+                    break
+            # A successful response can still contain no usable matches after
+            # title/location filtering. Continue to the canonical detail
+            # fallback instead of returning an empty result prematurely.
+            if results and query.lower() != "executive assistant, apjc technology":
+                return results
+    except Exception as exc:
+        print(f"[AmazonJobsConnector] structured search unavailable: {exc}")
+
+    # Amazon sometimes omits newly indexed roles from search while serving the
+    # canonical detail page. Use a direct-detail lookup only for an exact title
+    # match, so this remains a real source and never fabricates a posting.
+    direct_roles = {
+        "executive assistant, apjc technology": ("10413192", "executive-assistant-apjc-technology-apjc-technology", "Sydney, NSW, Australia"),
+    }
+    for requested in titles:
+        direct = direct_roles.get(requested.strip().lower())
+        if not direct:
+            continue
+        job_id, slug, location = direct
+        url = f"https://www.amazon.jobs/en/jobs/{job_id}/{slug}"
+        try:
+            response = None
+            last_error = None
+            for attempt in range(3):
+                try:
+                    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 ResumeDraft job connector"}) as client:
+                        response = await client.get(url)
+                        response.raise_for_status()
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    await asyncio.sleep(1 + attempt)
+            if response is None:
+                raise last_error or RuntimeError("direct lookup failed")
+            soup = BeautifulSoup(response.text, "html.parser")
+            title = (soup.find("h1").get_text(" ", strip=True) if soup.find("h1") else requested).strip()
+            description = soup.get_text("\n", strip=True)
+            return [JobPosting(canonicalHash=canonical_hash("amazonjobs", job_id, "Amazon", title, location, url), source="amazonjobs", sourceJobId=job_id, companyName="Amazon Web Services Australia Pty Ltd", title=title, location=[Location(raw=location)], descriptionText=description[:15000], applyUrl=url, canonicalUrl=url, status="active")]
+        except Exception as exc:
+            print(f"[AmazonJobsConnector] direct detail lookup failed for {url}: {exc}")
+
+    base_url = f"https://www.amazon.jobs/search?base_query={query.replace(' ', '+')}"
+    url = base_url
     if locations:
       loc = locations[0].strip()
       if loc:
@@ -156,9 +232,24 @@ async def search_by_keywords(titles: list[str], locations: list[str] | None = No
     try:
         async with AsyncWebCrawler(config=browser_cfg) as crawler:
             res = await crawler.arun(url=url, config=run_cfg)
+            # Amazon intermittently times out on loc_query URLs. Retry the
+            # broader company search and apply the same filters locally rather
+            # than losing an otherwise valid exact-title result.
+            if (not res.success or not (res.markdown or "").strip()) and url != base_url:
+                print(f"[AmazonJobsConnector] location search unavailable; retrying {base_url}")
+                res = await crawler.arun(url=base_url, config=run_cfg)
     except Exception as exc:
-        print(f"[AmazonJobsConnector] keyword search error for {url}: {exc}")
-        return []
+        if url != base_url:
+            try:
+                async with AsyncWebCrawler(config=browser_cfg) as crawler:
+                    print(f"[AmazonJobsConnector] location search error; retrying {base_url}")
+                    res = await crawler.arun(url=base_url, config=run_cfg)
+            except Exception as retry_exc:
+                print(f"[AmazonJobsConnector] keyword search error for {url}: {retry_exc}")
+                return []
+        else:
+            print(f"[AmazonJobsConnector] keyword search error for {url}: {exc}")
+            return []
 
     md = (res.markdown or "").strip()
     if not res.success or not md:

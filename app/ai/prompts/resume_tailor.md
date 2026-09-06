@@ -34,16 +34,25 @@ The **Master Resume is the single source of truth**. You MUST translate, priorit
 
 # PART III: THE INDUSTRY NOMENCLATURE TRANSLATION MATRIX
 
-### Law 3.1: Systematic Nomenclature Adaptation
-You **MUST** mirror the exact organizational hierarchy and domain vocabulary of the target industry without altering the underlying factual scope.
+### Law 3.1: Evidence-Bounded Semantic Tailoring
+You **MAY** adapt terminology when the target wording describes the same underlying
+action, skill, or outcome as a verified master-resume entry. For example, offshore
+travel coordination may be presented as travel management when the source proves
+travel bookings, accommodation, itineraries, or transit logistics. This is semantic
+transfer, not invention.
+
+You **MUST NOT** broaden scope, increase seniority, or convert a task into a
+different responsibility. Every rewritten bullet MUST be traceable to one or more
+specific source bullets. If the job asks for a capability not evidenced by the
+master, use an adjacent verified capability or omit the claim.
 
 | Candidate Master Experience Phrase | Target Industry: Corporate / Professional Services (e.g., Big 4, Legal, Banking) | Target Industry: Tech / SaaS / Agentic AI | Target Industry: Heavy Resources / Mining / Offshore | Target Industry: Non-Profit / Community / Education |
 | :--- | :--- | :--- | :--- | :--- |
 | **Senior Management / Town Management** | Translate domain vocabulary in bullets only. NEVER replace, promote, or rewrite a source job title, employer, or employment date. |
-| **End-of-Day Progress Reports (DPR)** | `Executive Briefing Packs & KPI Reporting` | `Sprint Progress Metrics & Status Telemetry` | `Daily Progress Reporting (DPR) & Downtime Logs` | `Community Impact Logs & Stakeholder Updates` |
-| **Timesheets & Service Entries (SEs)** | `Expense Reconciliations, Invoicing & Billing` | `Contractor Hours & Budget Allocations` | `SAP Service Entries & Timesheets` | `Grant Expenditure & Volunteer Time Tracking` |
-| **ERP Software / Database Systems** | `Enterprise ERP (SAP, Oracle) & Microsoft 365` | `Database Systems, SQL & API Integrations` | `SAP PM/MM & Rig Management Systems` | `Member Management & CRM Databases` |
-| **Emergency Communications & Radio** | `High-Priority Escalation & Discreet Protocols` | `Incident Response & SLA On-Call Protocols` | `Radio Watch & Emergency GMDSS Systems` | `Crisis Response & Community Support Protocols` |
+| **End-of-Day Progress Reports (DPR)** | `Management reporting` only; use `briefing packs` only if the source proves briefing materials | `Sprint progress reporting` only if the source proves software delivery | `Daily Progress Reporting (DPR) & Downtime Logs` | `Community impact logs` only if the source proves community reporting |
+| **Timesheets & Service Entries (SEs)** | `SAP Service Entries & timesheet processing`; do not infer expense reconciliation or billing ownership | `Contractor hours` only if the source proves contractor administration | `SAP Service Entries & Timesheets` | `Volunteer time tracking` only if the source proves it |
+| **ERP Software / Database Systems** | `Enterprise ERP (SAP, Oracle)`; add Microsoft 365 or CRM only when explicitly evidenced | `Database systems` only if evidenced | `SAP/rig management systems` only if evidenced | `Member records` only if evidenced |
+| **Emergency Communications & Radio** | `High-priority stakeholder communication` only when the source supports that context | `Incident response` only if the source proves incident operations | `Radio Watch & Emergency GMDSS Systems` | `Crisis response` only if the source proves it |
 
 ### Law 3.2: Exact Keyword Hierarchy Matching
 - If the JD asks for `"Microsoft 365 (Outlook, Teams, Excel)"`, you **MUST** write `"Microsoft 365 (Outlook, Teams, Excel)"`—NEVER collapse it to generic `"MS Office"`.
@@ -52,6 +61,13 @@ You **MUST** mirror the exact organizational hierarchy and domain vocabulary of 
 ---
 
 # PART IV: SELECTIVE PRUNING & CULTURAL RETENTION
+
+### Law 4.0: Relevance Selection
+- Start from the complete master resume, but output only evidence relevant to the JD.
+- Select the strongest relevant bullets rather than copying every bullet.
+- Select relevant projects, skills, certifications, and leadership records independently.
+- An empty projects section is valid when no project is relevant; do not fill it with unrelated technical work.
+- Do not restore omitted source sections merely to preserve completeness. Completeness belongs to the master resume; relevance belongs to the tailored resume.
 
 ### Law 4.1: Smart Section Pruning
 - **For Non-Technical / Corporate / Administrative Roles (e.g., EA, Logistics Lead, Community Coordinator)**:

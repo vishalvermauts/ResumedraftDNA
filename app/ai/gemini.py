@@ -1,5 +1,6 @@
 import os
 import subprocess
+import asyncio
 from google import genai
 from google.genai import types
 import google.auth.credentials
@@ -24,7 +25,8 @@ class StaticTokenCredentials(google.auth.credentials.Credentials):
 def _get_auth_client():
     use_vertex = os.getenv("USE_VERTEX_AI", "true").lower() == "true"
     if use_vertex:
-        project = os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")
+        # Firebase emulator namespace and Vertex billing project are independent.
+        project = os.getenv("VERTEX_PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft"))
         location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
         # Local certification can inject a short-lived gcloud access token without
@@ -82,11 +84,20 @@ class GeminiClient:
         if os.getenv("USE_VERTEX_AI", "true").lower() == "true":
             config_kwargs["labels"] = {"feature": feature, "app": "resumedraft"}
         
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=user,
-            config=types.GenerateContentConfig(**config_kwargs)
-        )
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=user,
+                    config=types.GenerateContentConfig(**config_kwargs)
+                )
+                break
+            except Exception as error:
+                last_error = error
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(2 ** attempt)
         return schema.model_validate_json(response.text)
 
     async def generate_grounded(self, prompt: str, feature: str = "search_grounding") -> str:

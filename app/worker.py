@@ -92,7 +92,10 @@ def _upgrade_via_known_ats(apply_url, loop):
     return None
 
 if not firebase_admin._apps:
-    firebase_admin.initialize_app(credentials.Certificate("serviceAccountKey.json"))
+    firebase_admin.initialize_app(
+        credentials.Certificate("serviceAccountKey.json"),
+        options={"projectId": os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")},
+    )
 
 celery_app = Celery(
     "worker",
@@ -304,6 +307,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 return
 
     uid = s["uid"]
+    saved_count = 0
     locations = s.get("locations") or ["Remote"]
 
     existing_urls = {
@@ -327,6 +331,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             target_countries.append(country_name)
 
     def _save_job(*, title, company, location, description, url, source):
+        nonlocal saved_count
         if not url:
             return
         if visa_only and not _mentions_sponsorship(description):
@@ -393,6 +398,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                     "canonicalHash": canonical_hash
                 })
                 existing_urls.add(url)
+                saved_count += 1
             except Exception as fs_job_err:
                 print(f"Automation: Failed to sync job to user Firestore collection: {fs_job_err}")
 
@@ -447,7 +453,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             adzuna_jobs = loop.run_until_complete(adzuna_search_by_keywords(
                 titles, locations=locations, country=country, remote_only=s.get("remoteOnly", False),
             ))
-        except (ConnectorError, ConnectorBackoffError) as e:
+        except Exception as e:
             print(f"Automation: Adzuna search failed for {uid}: {e}")
             adzuna_jobs = []
         for job in adzuna_jobs:
@@ -463,7 +469,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
             amazon_jobs = loop.run_until_complete(
                 amazonjobs_search_by_keywords(titles, locations=locations, max_results=10)
             )
-        except (ConnectorError, ConnectorBackoffError) as e:
+        except Exception as e:
             print(f"Automation: Amazon.jobs search failed for {uid}: {e}")
             amazon_jobs = []
         for job in amazon_jobs:
@@ -492,6 +498,8 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
         })
     except Exception as fs_err:
         print(f"Automation: Failed to sync lastRun back to Firestore for settings {s.get('_id')}: {fs_err}")
+
+    return {"status": "completed" if saved_count else "no_results", "savedCount": saved_count}
 
 
 
@@ -539,5 +547,5 @@ def run_single_automation_task(setting_id):
         return "Settings not found"
 
     fs = firestore.client()
-    _run_discovery_for_one(s, loop, fs, datetime.now(timezone.utc), force=True)
-    return "Manual run completed"
+    result = _run_discovery_for_one(s, loop, fs, datetime.now(timezone.utc), force=True)
+    return result

@@ -6,7 +6,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Initialize Firebase Admin
 cred = credentials.Certificate("serviceAccountKey.json") # Need to ensure this is present in prod
-firebase_admin.initialize_app(cred)
+firebase_admin.initialize_app(
+    cred,
+    options={"projectId": os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")},
+)
 
 security = HTTPBearer()
 

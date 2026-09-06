@@ -25,7 +25,7 @@ Every cover letter must fulfill 4 strategic functions while maintaining complete
 
 #### 2. Paragraph 2: Core Evidence & Deep Problem-Solving ("Why Me")
 - **Pillar-Specific Alignment**: Target the JD’s top 2–3 mission-critical competencies.
-- **Authentic Contextual Execution**: Articulate *how* the candidate operates in practice (e.g., enterprise ERP/SAP workflows, partner diary navigation, Python/MCP orchestration, remote FIFO safety compliance).
+- **Authentic Contextual Execution**: Articulate *how* the candidate operates in practice using only verified source evidence. Equivalent terminology is allowed (for example, offshore travel coordination may support a travel-management requirement), but partner diary ownership, invoice processing, CRM administration, or briefing-pack authorship must not be claimed unless explicitly evidenced in the master.
 - **Value Demonstration**: Connect past environments (Dubai Petroleum, Paragon Offshore, software engineering repos) to the target role's day-to-day demands without reading like a dry bullet-point copy-paste.
 
 #### 3. Paragraph 3: Cultural Chemistry & Proven Leadership ("Why Us & How I Lead")
@@ -45,7 +45,7 @@ The entire vocabulary, sentence cadence, and style MUST dynamically shift based 
 
 | Sector | Required Tone & Voice | Dynamic Vocabulary |
 | :--- | :--- | :--- |
-| **Big 4 / Corporate Services / Legal** (e.g., KPMG, Allens) | Executive, polished, highly discreet, service-oriented | *Partner alignment, diary optimization, executive briefing packs, governance, SAP billing, confidential stakeholder care, seamless office cadence* |
+| **Big 4 / Corporate Services / Legal** (e.g., KPMG, Allens) | Executive, polished, highly discreet, service-oriented | *Stakeholder coordination, travel logistics, document control, confidentiality, service entries, process improvement, seamless office cadence* |
 | **Tech / SaaS / Agentic AI Platforms** (e.g., Atlassian, Canva) | Product-minded, architectural, dynamic, collaborative | *Agentic workflows, Model Context Protocol (MCP), AST parsers, developer productivity, telemetry, sandbox isolation, system scalability* |
 | **Heavy Resources / Mining / FIFO** (e.g., BHP, Rio Tinto) | Pragmatic, safety-first, operationally disciplined | *Permit-to-work, Daily Progress Reporting (DPR), zero-harm culture, workforce mobilization, contractor SLAs, lifting plans, SAP service entries* |
 | **Humanitarian / Non-Profit / Education** (e.g., Red Cross, UTS) | Empathetic, mission-focused, community-centered | *Volunteer mobilization, food relief logistics, inclusive student engagement, grant administration, cross-cultural equity, crisis support* |
@@ -53,6 +53,8 @@ The entire vocabulary, sentence cadence, and style MUST dynamically shift based 
 ---
 
 # PART IV: OUTPUT CONSTRAINTS
+
+- **Evidence-Bounded Language**: Never turn a related duty into a new responsibility. Every factual claim must map to one or more specific master-resume entries. If the master proves travel bookings, use travel management; do not infer diary ownership. If it proves SAP Service Entries, do not infer invoice processing or billing.
 
 - **Word Count**: Strictly between **250 and 350 words** (single-page executive density).
 - **Truthfulness**: 100% anchored in verifiable facts from `master_resume.json`.

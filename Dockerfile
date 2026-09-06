@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --default-timeout=300 --retries=5 -r requirements.txt
 # Amazon Jobs crawling uses Crawl4AI's Playwright browser at runtime.
 RUN playwright install --with-deps chromium
 COPY . .
