@@ -31,7 +31,7 @@ def _firestore_master_lookup_enabled() -> bool:
     """
     return os.getenv("ENABLE_FIRESTORE_LOOKUP", "false").lower() == "true"
 
-def _enforce_cover_letter_word_limit(text: str | None, maximum: int = 350):
+def _enforce_cover_letter_word_limit(text: str | None, maximum: int = 340):
     if not isinstance(text, str) or len(text.split()) <= maximum:
         return text
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
