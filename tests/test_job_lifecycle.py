@@ -68,3 +68,21 @@ async def test_passed_deadline_marks_job_expired_but_not_filled(client):
         assert saved["status"] != "filled"
     finally:
         await db.db.job_postings.delete_one({"canonicalHash": canonical})
+
+
+async def test_job_upsert_assigns_stable_company_id(client):
+    from app.db.mongo import db
+
+    canonical = "company-link-regression-test"
+    await db.db.job_postings.delete_one({"canonicalHash": canonical})
+    try:
+        await db.upsert_job({
+            "canonicalHash": canonical, "source": "jsonld", "sourceJobId": "link-1",
+            "companyName": "Acme & Sons, Pty. Ltd.", "title": "Engineer",
+            "descriptionText": "Role", "applyUrl": "https://example.com/job",
+            "canonicalUrl": "https://example.com/job",
+        })
+        saved = await db.db.job_postings.find_one({"canonicalHash": canonical})
+        assert saved["companyId"] == "acme-sons-pty-ltd"
+    finally:
+        await db.db.job_postings.delete_one({"canonicalHash": canonical})

@@ -1,5 +1,16 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
+import unicodedata
+
+
+def canonical_company_id(company_name: str) -> str:
+    """Return a stable, provider-independent identity for a company name."""
+    value = unicodedata.normalize("NFKD", str(company_name or "")).encode(
+        "ascii", "ignore"
+    ).decode("ascii").lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+    return value or "unknown-company"
 
 class Database:
     client: AsyncIOMotorClient = None
@@ -25,6 +36,7 @@ class Database:
             await self.db.ai_usage_events.create_index(
                 [("uid", 1), ("createdAt", -1)], name="ai_usage_user_time"
             )
+            await self.backfill_company_ids()
         except Exception as error:
             # Older deployments could create duplicate snapshots before the
             # unique constraint existed. Repair identical content records,
@@ -40,6 +52,7 @@ class Database:
                 partialFilterExpression={"active": True},
                 name="one_active_master_per_user",
             )
+            await self.backfill_company_ids()
         print("Connected to MongoDB")
 
     async def _repair_snapshot_duplicates(self):
@@ -88,6 +101,9 @@ class Database:
     async def upsert_job(self, job_data):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
+        job_data["companyId"] = job_data.get("companyId") or canonical_company_id(
+            job_data.get("companyName")
+        )
         # `discoveredAt` is first-seen provenance, not a polling heartbeat. Do
         # not overwrite it when a connector sees the same posting again.
         first_seen = job_data.pop("discoveredAt", None) or now
@@ -145,5 +161,20 @@ class Database:
             },
             {"$set": {"status": "expired", "expiredAt": now}},
         )
+
+    async def backfill_company_ids(self):
+        """Backfill stable company identities on legacy normalized job records."""
+        updated = 0
+        cursor = self.db.job_postings.find(
+            {"$or": [{"companyId": {"$exists": False}}, {"companyId": None}, {"companyId": ""}]},
+            {"_id": 1, "companyName": 1},
+        )
+        async for job in cursor:
+            result = await self.db.job_postings.update_one(
+                {"_id": job["_id"], "$or": [{"companyId": {"$exists": False}}, {"companyId": None}, {"companyId": ""}]},
+                {"$set": {"companyId": canonical_company_id(job.get("companyName"))}},
+            )
+            updated += result.modified_count
+        return updated
 
 db = Database()

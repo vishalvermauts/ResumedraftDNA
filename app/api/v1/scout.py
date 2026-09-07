@@ -40,6 +40,7 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
                 data = doc.to_dict()
                 wl_doc = {
                     "companyName": data.get("companyName"),
+                    "companyId": data.get("companyId"),
                     "careersUrl": data.get("careersUrl"),
                     "connector": {
                         "type": data.get("connectorType"),

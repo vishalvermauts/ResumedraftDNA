@@ -21,6 +21,7 @@ class WatchlistResolution(BaseModel):
 
 class CompanyWatchlist(BaseModel):
     companyName: str
+    companyId: Optional[str] = None
     careersUrl: str
     connector: ConnectorConfig
     pollingFrequencyMinutes: int = 720

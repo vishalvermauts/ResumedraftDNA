@@ -5,7 +5,7 @@ import random
 import inspect
 import hashlib
 from celery import Celery
-from .db.mongo import db
+from .db.mongo import db, canonical_company_id
 from .connectors.registry import get_connector
 from .connectors.base import (
     SUCCESS_WITH_JOBS,
@@ -272,6 +272,9 @@ def discover_jobs_task():
             )
 
         if jobs:
+            for job in jobs:
+                if not getattr(job, "companyId", None):
+                    job.companyId = canonical_company_id(wl.get("companyName"))
             jobs_dict = [job.model_dump() for job in jobs]
             ingest_jobs_task.delay(jobs_dict)
 

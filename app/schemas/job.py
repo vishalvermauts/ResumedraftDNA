@@ -20,6 +20,7 @@ class JobPosting(BaseModel):
     source: str # "greenhouse", "lever", "manual"
     sourceJobId: str
     companyName: str
+    companyId: Optional[str] = None
     title: str
     location: List[Location] = []
     type: Optional[str] = None # "full_time", etc.

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from ...auth import get_current_user
-from ...db.mongo import db
+from ...db.mongo import db, canonical_company_id
 from ...schemas.watchlist import CompanyWatchlist
 from bson import ObjectId
 from datetime import datetime
@@ -14,6 +14,7 @@ async def add_to_watchlist(
 ):
     doc = item.model_dump()
     doc["uid"] = user["uid"]
+    doc["companyId"] = doc.get("companyId") or canonical_company_id(doc.get("companyName"))
     doc["createdAt"] = datetime.utcnow()
     doc["nextRunAt"] = datetime.utcnow()
     
