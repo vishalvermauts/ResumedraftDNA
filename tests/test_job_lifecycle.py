@@ -48,3 +48,23 @@ async def test_source_confirmed_close_marks_only_matching_job_filled(client):
         assert saved["status"] == "filled"
     finally:
         await db.db.job_postings.delete_one({"canonicalHash": canonical})
+
+
+async def test_passed_deadline_marks_job_expired_but_not_filled(client):
+    from app.db.mongo import db
+
+    canonical = "deadline-regression-test"
+    await db.db.job_postings.delete_one({"canonicalHash": canonical})
+    try:
+        await db.upsert_job({
+            "canonicalHash": canonical, "source": "jsonld", "sourceJobId": "deadline-1",
+            "companyName": "Acme", "title": "Engineer", "descriptionText": "Role",
+            "applyUrl": "https://example.com/job", "canonicalUrl": "https://example.com/job",
+            "applicationDeadline": datetime.now(timezone.utc),
+        })
+        await db.expire_deadline_jobs(datetime.now(timezone.utc))
+        saved = await db.db.job_postings.find_one({"canonicalHash": canonical})
+        assert saved["status"] == "expired"
+        assert saved["status"] != "filled"
+    finally:
+        await db.db.job_postings.delete_one({"canonicalHash": canonical})

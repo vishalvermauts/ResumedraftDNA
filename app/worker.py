@@ -146,6 +146,7 @@ def discover_jobs_task():
     # run rather than hammering it; the next hourly run retries it fresh.
     provider_backoff = set()
     now = datetime.now(timezone.utc)
+    loop.run_until_complete(db.expire_deadline_jobs(now))
 
     for wl in watchlists:
         connector_cfg = wl.get("connector", {})

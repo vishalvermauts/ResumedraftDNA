@@ -136,4 +136,14 @@ class Database:
             {"$set": {"status": "filled", "filledAt": now}},
         )
 
+    async def expire_deadline_jobs(self, now):
+        """Transition passed application deadlines without overriding filled jobs."""
+        return await self.db.job_postings.update_many(
+            {
+                "applicationDeadline": {"$lte": now},
+                "status": {"$nin": ["filled", "expired"]},
+            },
+            {"$set": {"status": "expired", "expiredAt": now}},
+        )
+
 db = Database()

@@ -3,6 +3,7 @@ from ...connectors.registry import get_connector
 from ...worker import ingest_jobs_task
 from ...auth import get_current_user
 from ...db.mongo import db
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -113,6 +114,7 @@ async def get_scouted_jobs(
     include_inactive: bool = False,
     user: dict = Depends(get_current_user)
 ):
+    await db.expire_deadline_jobs(datetime.now(timezone.utc))
     query_filter = {}
     uid = user.get("uid")
 
