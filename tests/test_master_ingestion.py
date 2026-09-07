@@ -1,4 +1,5 @@
 from app.ai.master_ingestion import section_chunks, source_section_chunks
+from app.schemas.master_ingestion import MasterChunkExtraction, MasterSourceIngestRequest
 
 
 def test_section_chunks_are_stable_and_bounded():
@@ -33,3 +34,15 @@ def test_source_section_chunks_preserve_provenance_and_boundaries():
     ]
     assert chunks[1]["lines"][0]["sourceId"] == "p0002"
     assert chunks[-1]["text"] == "First Aid"
+
+
+def test_source_ingestion_contract_is_bounded_and_structured():
+    request = MasterSourceIngestRequest(
+        sourceFileName="master.docx",
+        sourceFormat="docx",
+        sourceFileHash="sha256:abc",
+        rawText="EXPERIENCE\nRig Administrator",
+    )
+    assert len(request.rawText) < 250_000
+    extracted = MasterChunkExtraction(items=[{"jobTitle": "Rig Administrator"}])
+    assert extracted.items[0]["jobTitle"] == "Rig Administrator"

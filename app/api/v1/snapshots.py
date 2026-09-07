@@ -2,10 +2,114 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...auth import get_current_user
 from ...db.mongo import db
 from ...schemas.snapshot import ResumeSnapshot
+from ...schemas.master_ingestion import MasterChunkExtraction, MasterSourceIngestRequest
 from ...ai.master_snapshot import add_source_provenance, content_hash
+from ...ai.master_ingestion import source_section_chunks
+from ...ai.gemini import gemini_client
 from datetime import datetime
 
 router = APIRouter()
+
+
+SECTION_INSTRUCTIONS = {
+    "header": "Extract one personalDetails object and, if present, one professionalSummary string.",
+    "employmentHistory": "Extract employment entries with jobTitle, company, location, startDate, endDate, and bulletPoints.",
+    "education": "Extract education entries with degree, major, school, endDate, and relevantCoursework.",
+    "projects": "Extract every project with name, techStack, url, and description as an array of source-supported bullets.",
+    "skills": "Extract skills as category/items objects, preserving the source categories and exact skill names.",
+    "leadershipVolunteering": "Extract every leadership or volunteering entry with role, organization, startDate, endDate, and bulletPoints.",
+    "certifications": "Extract every certification with name and date.",
+}
+
+
+async def _extract_source_snapshot(request: MasterSourceIngestRequest) -> dict:
+    chunks = source_section_chunks(request.rawText, max_lines=120)
+    if not chunks:
+        raise HTTPException(status_code=422, detail="Source text contains no extractable sections")
+    result: dict = {
+        "personalDetails": {},
+        "professionalSummary": "",
+        "employmentHistory": [],
+        "education": [],
+        "projects": [],
+        "skills": [],
+        "leadershipVolunteering": [],
+        "certifications": [],
+        "customSections": [],
+    }
+    for chunk in chunks:
+        instruction = SECTION_INSTRUCTIONS.get(chunk["section"])
+        if not instruction:
+            continue
+        prompt = (
+            "Extract only facts present in this source chunk. Never invent, merge, rename, or upgrade facts. "
+            "Return an object with an items array. " + instruction + "\n\n"
+            f"SOURCE CHUNK {chunk['chunkId']} (lines {chunk['startLine']}-{chunk['endLine']}):\n{chunk['text']}"
+        )
+        extracted = await gemini_client.generate_structured(
+            system=(
+                "You are a deterministic resume ingestion service. Return strict JSON only. "
+                "Every item must be directly supported by the supplied source chunk. "
+                "Use empty strings or arrays for unavailable fields."
+            ),
+            user=prompt,
+            schema=MasterChunkExtraction,
+            feature="resume_master_ingestion",
+            max_output_tokens=4096,
+        )
+        if not extracted.items:
+            continue
+        for item in extracted.items:
+            item["sourceEvidenceIds"] = [line["sourceId"] for line in chunk["lines"]]
+        if chunk["section"] == "header":
+            for item in extracted.items:
+                if isinstance(item.get("personalDetails"), dict):
+                    result["personalDetails"].update(item["personalDetails"])
+                if item.get("professionalSummary"):
+                    result["professionalSummary"] = item["professionalSummary"]
+        else:
+            result[chunk["section"]].extend(extracted.items)
+    if not result["personalDetails"] and not result["employmentHistory"]:
+        raise HTTPException(status_code=422, detail="Vertex extraction returned no usable master data")
+    result["metadata"] = {
+        "sourceFileName": request.sourceFileName,
+        "sourceFormat": request.sourceFormat,
+        "sourceFileHash": request.sourceFileHash,
+        "sourceTextHash": request.sourceTextHash,
+        "parseStatus": "validated",
+        "ingestionMode": "vertex-section-chunks",
+    }
+    return add_source_provenance(result, source_prefix="source")
+
+
+@router.post("/resume-snapshots/ingest-source")
+async def ingest_source_resume(
+    request: MasterSourceIngestRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Compile raw resume text once into a validated immutable master snapshot."""
+    structured_data = await _extract_source_snapshot(request)
+    snapshot_hash = structured_data["metadata"]["contentHash"]
+    snapshot_doc = {
+        "uid": user["uid"],
+        "firestoreResumeId": None,
+        "version": 1,
+        "contentHash": snapshot_hash,
+        "sourceFileHash": request.sourceFileHash,
+        "sourceTextHash": request.sourceTextHash,
+        "schemaVersion": "resume-v1",
+        "structuredData": structured_data,
+        "active": False,
+        "createdAt": datetime.utcnow(),
+    }
+    existing = await db.db.resume_snapshots.find_one({"uid": user["uid"], "contentHash": snapshot_hash})
+    if not existing:
+        await db.db.resume_snapshots.insert_one(snapshot_doc)
+    await db.db.resume_snapshots.update_many({"uid": user["uid"], "active": True}, {"$set": {"active": False}})
+    await db.db.resume_snapshots.update_one(
+        {"uid": user["uid"], "contentHash": snapshot_hash}, {"$set": {"active": True}}
+    )
+    return {"status": "success", "contentHash": snapshot_hash, "structuredData": structured_data}
 
 @router.post("/resume-snapshots")
 async def create_resume_snapshot(
