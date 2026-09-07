@@ -534,7 +534,7 @@ def personalized_discovery_task():
 
 
 @celery_app.task
-def run_single_automation_task(setting_id):
+def run_single_automation_task(setting_id, run_id=None):
     """Manual "Run Now" trigger for one automation_settings record, queued from
     POST /automation-settings/{id}/run-now. Runs the same matching logic as the hourly beat
     job but for a single record and bypassing the frequency throttle."""
@@ -547,5 +547,24 @@ def run_single_automation_task(setting_id):
         return "Settings not found"
 
     fs = firestore.client()
-    result = _run_discovery_for_one(s, loop, fs, datetime.now(timezone.utc), force=True)
-    return result
+    if run_id and s.get("runId") != run_id:
+        return "Run superseded"
+    try:
+        loop.run_until_complete(db.db.automation_settings.update_one(
+            {"_id": s["_id"], **({"runId": run_id} if run_id else {})},
+            {"$set": {"runStatus": "running"}},
+        ))
+        result = _run_discovery_for_one(s, loop, fs, datetime.now(timezone.utc), force=True)
+        now = datetime.now(timezone.utc)
+        loop.run_until_complete(db.db.automation_settings.update_one(
+            {"_id": s["_id"], **({"runId": run_id} if run_id else {})},
+            {"$set": {"runStatus": "completed", "lastRunAt": now, "updatedAt": now}, "$unset": {"runLockUntil": ""}},
+        ))
+        return result
+    except Exception:
+        now = datetime.now(timezone.utc)
+        loop.run_until_complete(db.db.automation_settings.update_one(
+            {"_id": s["_id"], **({"runId": run_id} if run_id else {})},
+            {"$set": {"runStatus": "failed", "updatedAt": now}, "$unset": {"runLockUntil": ""}},
+        ))
+        raise

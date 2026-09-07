@@ -35,10 +35,10 @@ async def clean_db():
     first test's loop tears down. The connection itself is cheap; this trades a little
     per-test overhead for not fighting event-loop lifetime."""
     await db.connect()
-    for collection in ["company_watchlists", "resume_snapshots", "artifacts"]:
+    for collection in ["company_watchlists", "resume_snapshots", "artifacts", "automation_settings"]:
         await db.db[collection].delete_many({"uid": FAKE_UID})
     yield
-    for collection in ["company_watchlists", "resume_snapshots", "artifacts"]:
+    for collection in ["company_watchlists", "resume_snapshots", "artifacts", "automation_settings"]:
         await db.db[collection].delete_many({"uid": FAKE_UID})
     db.client.close()
 

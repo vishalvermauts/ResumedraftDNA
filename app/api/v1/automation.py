@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from bson import ObjectId
+from pymongo.collection import ReturnDocument
 from bson.errors import InvalidId
 from ...auth import get_current_user
 from ...db.mongo import db
 from ...schemas.automation import AutomationSettings
 from ...worker import run_single_automation_task
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 router = APIRouter()
 
@@ -16,6 +18,10 @@ def _serialize(doc):
         doc["lastRunAt"] = doc["lastRunAt"].isoformat()
     if doc.get("updatedAt"):
         doc["updatedAt"] = doc["updatedAt"].isoformat()
+    if doc.get("runRequestedAt"):
+        doc["runRequestedAt"] = doc["runRequestedAt"].isoformat()
+    if doc.get("runLockUntil"):
+        doc["runLockUntil"] = doc["runLockUntil"].isoformat()
     return doc
 
 
@@ -70,19 +76,38 @@ async def run_automation_now(setting_id: str, user: dict = Depends(get_current_u
     scheduled run. Follows the same fire-and-forget Celery dispatch pattern as
     POST /scout/watchlist."""
     await _find_owned(setting_id, user["uid"])
-    now = datetime.utcnow()
-    await db.db.automation_settings.update_one(
-        {"_id": ObjectId(setting_id)},
-        {"$set": {"lastRunAt": now, "updatedAt": now}}
+    now = datetime.now(timezone.utc)
+    run_id = str(uuid4())
+    lease_until = now + timedelta(minutes=15)
+    queued = await db.db.automation_settings.find_one_and_update(
+        {
+            "_id": ObjectId(setting_id),
+            "uid": user["uid"],
+            "$or": [
+                {"runLockUntil": {"$exists": False}},
+                {"runLockUntil": {"$lte": now}},
+            ],
+        },
+        {"$set": {
+            "runId": run_id,
+            "runStatus": "queued",
+            "runRequestedAt": now,
+            "runLockUntil": lease_until,
+            "updatedAt": now,
+        }},
+        return_document=ReturnDocument.AFTER,
     )
+    if not queued:
+        raise HTTPException(status_code=409, detail="This automation search is already running")
     try:
         from firebase_admin import firestore
         fs = firestore.client()
         fs.collection("automation_settings").document(setting_id).set({
-            "lastRunAt": now.isoformat(),
+            "runStatus": "queued",
+            "runRequestedAt": now.isoformat(),
             "updatedAt": now.isoformat(),
         }, merge=True)
     except Exception as sync_err:
         print(f"Automation: Failed to sync run-now timestamp to Firestore for {setting_id}: {sync_err}")
-    run_single_automation_task.delay(setting_id)
-    return {"status": "started", "lastRunAt": now.isoformat()}
+    run_single_automation_task.delay(setting_id, run_id)
+    return {"status": "queued", "runId": run_id, "runRequestedAt": now.isoformat()}
