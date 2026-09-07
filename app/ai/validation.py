@@ -158,3 +158,44 @@ def attach_claim_evidence(generated: dict[str, Any]) -> dict[str, Any]:
                     if not isinstance(existing, list) or len(existing) != len(claims):
                         item["claimEvidenceIds"] = [list(source_ids) for _ in claims]
     return generated
+
+
+def repair_unsupported_claims(generated: dict[str, Any], source: dict[str, Any] | None) -> dict[str, Any]:
+    """Replace unsupported model paraphrases with source-backed wording.
+
+    The release gate remains fail-closed: this is a deterministic repair before
+    validation, not an exemption. Identity fields and selected records remain
+    unchanged; only a narrative claim that cannot be supported by its cited
+    source is reverted to the matching master claim.
+    """
+    if not isinstance(generated, dict) or not isinstance(source, dict):
+        return generated
+    evidence_map = _source_evidence_map(source)
+    for section in ("employmentHistory", "projects", "leadershipVolunteering", "certifications"):
+        source_items = _items(source.get(section))
+        for item in _items(generated.get(section)):
+            if not isinstance(item, dict):
+                continue
+            identity = item.get("id") or item.get("name") or item.get("organization")
+            original = next((candidate for candidate in source_items
+                             if isinstance(candidate, dict) and identity and
+                             (candidate.get("id") == identity or candidate.get("name") == identity or candidate.get("organization") == identity)), None)
+            if not original:
+                continue
+            for field in ("bulletPoints", "description"):
+                claims = item.get(field)
+                source_claims = original.get(field)
+                if not isinstance(claims, list) or not claims or not isinstance(source_claims, list) or not source_claims:
+                    continue
+                cited_ids = item.get("claimEvidenceIds") if isinstance(item.get("claimEvidenceIds"), list) else []
+                repaired = []
+                for index, claim in enumerate(claims):
+                    claim_ids = cited_ids[index] if index < len(cited_ids) and isinstance(cited_ids[index], list) else item.get("sourceEvidenceIds") or []
+                    cited_text = " ".join(evidence_map.get(evidence_id, "") for evidence_id in claim_ids)
+                    if not cited_text or not _meaningful_tokens(claim).intersection(_meaningful_tokens(cited_text)):
+                        repaired.append(source_claims[index] if index < len(source_claims) else source_claims[0])
+                    else:
+                        repaired.append(claim)
+                item[field] = repaired
+                item.pop("claimEvidenceIds", None)
+    return generated

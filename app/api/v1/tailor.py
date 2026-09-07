@@ -12,6 +12,7 @@ from ...ai.validation import (
     validate_protected_facts,
     validate_source_backed_sections,
     attach_claim_evidence,
+    repair_unsupported_claims,
 )
 from ...ai.master_snapshot import add_source_provenance
 from firebase_admin import firestore
@@ -419,6 +420,7 @@ async def tailor_resume(
         source_resume, tailored_resume, cover_letter
     )
     if tailored_resume:
+        tailored_resume = repair_unsupported_claims(tailored_resume, source_resume)
         tailored_resume = attach_claim_evidence(tailored_resume)
     # Normalize the model output before validating the public word-count
     # contract. The validator must inspect exactly what will be persisted.
