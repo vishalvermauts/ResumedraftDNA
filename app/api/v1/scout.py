@@ -43,7 +43,7 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
                     "connector": {
                         "type": data.get("connectorType"),
                         "boardToken": data.get("boardToken"),
-                        "priority": data.get("priority") or [data.get("connectorType"), "jsonld", "ai_search"],
+                        "priority": [item for item in (data.get("priority") or [data.get("connectorType"), "jsonld"]) if item != "ai_search"],
                         "configuration": {}
                     },
                     "pollingFrequencyMinutes": 720,
@@ -67,7 +67,7 @@ async def trigger_watchlist_scout(user: dict = Depends(get_current_user)):
     per_company = []
     for wl in watchlists:
         connector_cfg = wl.get("connector", {})
-        priority = connector_cfg.get("priority") or ([connector_cfg["type"]] if connector_cfg.get("type") else [])
+        priority = [item for item in (connector_cfg.get("priority") or ([connector_cfg["type"]] if connector_cfg.get("type") else [])) if item != "ai_search"]
         config = {
             "boardToken": connector_cfg.get("boardToken"),
             "companyName": wl.get("companyName"),

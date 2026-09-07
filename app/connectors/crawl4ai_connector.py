@@ -3,6 +3,7 @@ from typing import List
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from .base import BaseConnector, canonical_hash, html_to_text
 from ..schemas.job import JobPosting, Location
+from ..security.url_policy import UnsafeOutboundUrl, validate_public_https_url
 
 class Crawl4AiConnector(BaseConnector):
     """Deep stealth headless crawler for complex single-page applications, 
@@ -11,6 +12,12 @@ class Crawl4AiConnector(BaseConnector):
 
     async def fetch_jobs(self) -> List[JobPosting]:
         if not self.careers_url:
+            return []
+
+        try:
+            target_url = validate_public_https_url(self.careers_url)
+        except UnsafeOutboundUrl as exc:
+            print(f"[Crawl4AiConnector] blocked unsafe URL: {exc}")
             return []
 
         browser_cfg = BrowserConfig(
@@ -27,7 +34,7 @@ class Crawl4AiConnector(BaseConnector):
         jobs = []
         try:
             async with AsyncWebCrawler(config=browser_cfg) as crawler:
-                res = await crawler.arun(url=self.careers_url, config=run_cfg)
+                res = await crawler.arun(url=target_url, config=run_cfg)
                 if not res.success or not res.markdown:
                     return []
 

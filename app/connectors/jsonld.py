@@ -3,6 +3,7 @@ import json
 import re
 from .base import BaseConnector, canonical_hash, html_to_text
 from ..schemas.job import JobPosting, Location
+from ..security.url_policy import UnsafeOutboundUrl, validate_public_https_url
 
 LD_JSON_RE = re.compile(
     r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -18,12 +19,25 @@ class JsonLdConnector(BaseConnector):
         if not self.careers_url:
             return []
 
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        try:
+            target_url = validate_public_https_url(self.careers_url)
+        except UnsafeOutboundUrl as exc:
+            print(f"[JsonLdConnector] blocked unsafe URL: {exc}")
+            return []
+
+        async with httpx.AsyncClient(follow_redirects=False) as client:
             response = await client.get(
-                self.careers_url,
+                target_url,
                 timeout=15.0,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; ResumeDraftBot/1.0)"}
             )
+            if response.is_redirect:
+                try:
+                    target_url = validate_public_https_url(response.headers.get("location", ""))
+                except UnsafeOutboundUrl as exc:
+                    print(f"[JsonLdConnector] blocked unsafe redirect: {exc}")
+                    return []
+                response = await client.get(target_url, timeout=15.0, headers={"User-Agent": "Mozilla/5.0 (compatible; ResumeDraftBot/1.0)"})
             response.raise_for_status()
             html = response.text
 
