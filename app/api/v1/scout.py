@@ -110,12 +110,15 @@ async def get_scouted_jobs(
     limit: int = 20,
     q: str = "",
     sort_by: str = "freshness",
+    include_inactive: bool = False,
     user: dict = Depends(get_current_user)
 ):
     query_filter = {}
     uid = user.get("uid")
 
     and_clauses = []
+    if not include_inactive:
+        and_clauses.append({"status": {"$nin": ["stale", "expired", "filled"]}})
 
     if personalized and uid:
         # Fetch user's active automation settings

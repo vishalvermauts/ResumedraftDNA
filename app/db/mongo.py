@@ -100,4 +100,25 @@ class Database:
             upsert=True
         )
 
+    async def mark_source_empty(self, company_name: str, source: str, now, stale_after: int = 2):
+        """Advance stale detection only after a healthy empty provider response.
+
+        An empty feed cannot prove a role was filled, so this deliberately marks
+        postings stale rather than filled. A later observation reactivates them
+        through ``upsert_job``.
+        """
+        match = {
+            "companyName": company_name,
+            "source": source,
+            "status": {"$in": ["active", "stale"]},
+        }
+        await self.db.job_postings.update_many(
+            match,
+            {"$inc": {"missedPolls": 1}, "$set": {"lastPollAt": now}},
+        )
+        await self.db.job_postings.update_many(
+            {**match, "missedPolls": {"$gte": stale_after}},
+            {"$set": {"status": "stale", "staleSince": now}},
+        )
+
 db = Database()

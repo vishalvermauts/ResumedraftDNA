@@ -32,5 +32,5 @@ class JobPosting(BaseModel):
     discoveredAt: datetime = Field(default_factory=datetime.utcnow)
     lastSeenAt: datetime = Field(default_factory=datetime.utcnow)
     missedPolls: int = 0
-    status: str = "active" # "active", "expired", "filled"
+    status: str = "active" # "active", "stale", "expired", "filled"
     applicationDeadline: Optional[datetime] = None

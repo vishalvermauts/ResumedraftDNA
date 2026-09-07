@@ -259,6 +259,11 @@ def discover_jobs_task():
             )
         )
 
+        if chosen_type and chosen_status == SUCCESS_EMPTY:
+            loop.run_until_complete(
+                db.mark_source_empty(wl.get("companyName") or "", chosen_type, now)
+            )
+
         if jobs:
             jobs_dict = [job.model_dump() for job in jobs]
             ingest_jobs_task.delay(jobs_dict)
