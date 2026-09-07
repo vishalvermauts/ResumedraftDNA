@@ -388,7 +388,8 @@ async def tailor_resume(
             user=prompt,
             schema=TailoredArtifact,
             feature=feature_label,
-            thinking_level="medium"
+            thinking_level="medium",
+            uid=user["uid"],
         )
         tailored_resume = _parse_model_json(result.tailoredResume) if result.tailoredResume else None
         tailored_resume = _preserve_source_identity(source_resume, tailored_resume, req.description)

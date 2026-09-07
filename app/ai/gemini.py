@@ -1,10 +1,12 @@
 import os
 import subprocess
 import asyncio
+import time
 from google import genai
 from google.genai import types
 import google.auth.credentials
 from pydantic import BaseModel
+from .usage import record_ai_usage
 
 
 class StaticTokenCredentials(google.auth.credentials.Credentials):
@@ -73,7 +75,8 @@ class GeminiClient:
         schema: type[BaseModel],
         feature: str = "resume_tailor",
         thinking_level: str = "low",
-        max_output_tokens: int = 8192
+        max_output_tokens: int = 8192,
+        uid: str | None = None,
     ) -> BaseModel:
         config_kwargs = {
             "system_instruction": system,
@@ -87,6 +90,8 @@ class GeminiClient:
             config_kwargs["labels"] = {"feature": feature, "app": "resumedraft"}
         
         last_error = None
+        started_at = time.perf_counter()
+        provider = "vertex_ai" if os.getenv("USE_VERTEX_AI", "true").lower() == "true" else "gemini_api"
         for attempt in range(3):
             try:
                 response = await self.client.aio.models.generate_content(
@@ -100,10 +105,25 @@ class GeminiClient:
                     raise ValueError("Vertex structured generation was truncated: MAX_TOKENS")
                 if not getattr(response, "text", None):
                     raise ValueError("Vertex structured generation returned no text")
+                usage = getattr(response, "usage_metadata", None)
+                usage_dict = {
+                    "promptTokenCount": getattr(usage, "prompt_token_count", None),
+                    "candidatesTokenCount": getattr(usage, "candidates_token_count", None),
+                    "totalTokenCount": getattr(usage, "total_token_count", None),
+                } if usage else {}
+                await record_ai_usage(
+                    uid=uid, feature=feature, model=self.model, provider=provider,
+                    usage_metadata=usage_dict, duration_ms=(time.perf_counter() - started_at) * 1000,
+                )
                 break
             except Exception as error:
                 last_error = error
                 if attempt == 2:
+                    await record_ai_usage(
+                        uid=uid, feature=feature, model=self.model, provider=provider,
+                        status="failed", error_code=type(error).__name__,
+                        duration_ms=(time.perf_counter() - started_at) * 1000,
+                    )
                     raise
                 await asyncio.sleep(2 ** attempt)
         return schema.model_validate_json(response.text)

@@ -22,6 +22,9 @@ class Database:
                 partialFilterExpression={"active": True},
                 name="one_active_master_per_user",
             )
+            await self.db.ai_usage_events.create_index(
+                [("uid", 1), ("createdAt", -1)], name="ai_usage_user_time"
+            )
         except Exception as error:
             # Older deployments could create duplicate snapshots before the
             # unique constraint existed. Repair identical content records,

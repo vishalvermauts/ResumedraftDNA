@@ -22,7 +22,7 @@ SECTION_INSTRUCTIONS = {
 }
 
 
-async def _extract_source_snapshot(request: MasterSourceIngestRequest) -> dict:
+async def _extract_source_snapshot(request: MasterSourceIngestRequest, uid: str | None = None) -> dict:
     # Keep each Vertex request bounded. Large projects/skills sections can be
     # syntactically valid but truncated JSON when sent as one request.
     chunks = source_section_chunks(request.rawText, max_lines=40)
@@ -59,6 +59,7 @@ async def _extract_source_snapshot(request: MasterSourceIngestRequest) -> dict:
                 schema=MasterChunkExtraction,
                 feature="resume_master_ingestion",
                 max_output_tokens=8192,
+                uid=uid,
             )
         except Exception as exc:
             raise HTTPException(
@@ -96,7 +97,7 @@ async def ingest_source_resume(
     user: dict = Depends(get_current_user),
 ):
     """Compile raw resume text once into a validated immutable master snapshot."""
-    structured_data = await _extract_source_snapshot(request)
+    structured_data = await _extract_source_snapshot(request, user["uid"])
     snapshot_hash = structured_data["metadata"]["contentHash"]
     snapshot_doc = {
         "uid": user["uid"],
