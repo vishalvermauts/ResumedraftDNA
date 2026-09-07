@@ -21,6 +21,8 @@ async def test_create_and_list_watchlist_entry(client):
     assert listed.status_code == 200
     ids = [item["id"] for item in listed.json()]
     assert item_id in ids
+    saved = next(item for item in listed.json() if item["id"] == item_id)
+    assert saved["companyId"] == "acme"
 
 
 async def test_owner_can_delete_own_entry(client):

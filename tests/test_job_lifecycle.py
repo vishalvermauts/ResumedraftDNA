@@ -50,6 +50,24 @@ async def test_source_confirmed_close_marks_only_matching_job_filled(client):
         await db.db.job_postings.delete_one({"canonicalHash": canonical})
 
 
+async def test_unconfirmed_or_different_source_close_does_not_fill_job(client):
+    from app.db.mongo import db
+
+    canonical = "filled-safety-regression-test"
+    await db.db.job_postings.delete_one({"canonicalHash": canonical})
+    try:
+        await db.upsert_job({
+            "canonicalHash": canonical, "source": "greenhouse", "sourceJobId": "open-1",
+            "companyName": "Acme", "title": "Engineer", "descriptionText": "Role",
+            "applyUrl": "https://example.com/job", "canonicalUrl": "https://example.com/job",
+        })
+        await db.mark_source_closed("Acme", "recruitee", ["open-1"], datetime.now(timezone.utc))
+        saved = await db.db.job_postings.find_one({"canonicalHash": canonical})
+        assert saved["status"] == "active"
+    finally:
+        await db.db.job_postings.delete_one({"canonicalHash": canonical})
+
+
 async def test_passed_deadline_marks_job_expired_but_not_filled(client):
     from app.db.mongo import db
 
