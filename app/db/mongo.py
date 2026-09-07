@@ -53,9 +53,14 @@ class Database:
         duplicates = await self.db.resume_snapshots.aggregate(pipeline).to_list(length=None)
         for group in duplicates:
             ids = group.get("ids") or []
-            # Preserve the first document; identical content is immutable and
-            # active selection is handled separately by the active index.
-            for duplicate_id in ids[1:]:
+            ordered = await self.db.resume_snapshots.find(
+                {"_id": {"$in": ids}}
+            ).sort([
+                ("active", -1), ("updatedAt", -1), ("createdAt", -1), ("_id", 1)
+            ]).to_list(length=None)
+            # Preserve the active/newest copy; identical content is immutable.
+            for duplicate in ordered[1:]:
+                duplicate_id = duplicate["_id"]
                 await self.db.resume_snapshots.delete_one({"_id": duplicate_id})
         active_groups = await self.db.resume_snapshots.aggregate([
             {"$match": {"uid": {"$exists": True}, "active": True}},
@@ -63,9 +68,15 @@ class Database:
             {"$match": {"count": {"$gt": 1}}},
         ]).to_list(length=None)
         for group in active_groups:
-            for duplicate_id in (group.get("ids") or [])[1:]:
+            ids = group.get("ids") or []
+            ordered = await self.db.resume_snapshots.find(
+                {"_id": {"$in": ids}}
+            ).sort([
+                ("updatedAt", -1), ("createdAt", -1), ("_id", 1)
+            ]).to_list(length=None)
+            for duplicate in ordered[1:]:
                 await self.db.resume_snapshots.update_one(
-                    {"_id": duplicate_id}, {"$set": {"active": False}}
+                    {"_id": duplicate["_id"]}, {"$set": {"active": False}}
                 )
 
     async def close(self):
