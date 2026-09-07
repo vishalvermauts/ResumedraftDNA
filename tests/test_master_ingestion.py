@@ -1,4 +1,4 @@
-from app.ai.master_ingestion import section_chunks
+from app.ai.master_ingestion import section_chunks, source_section_chunks
 
 
 def test_section_chunks_are_stable_and_bounded():
@@ -21,3 +21,15 @@ def test_section_chunks_reject_invalid_bound():
         assert "positive" in str(error)
     else:
         raise AssertionError("expected invalid chunk bound to fail")
+
+
+def test_source_section_chunks_preserve_provenance_and_boundaries():
+    chunks = source_section_chunks(
+        "VISHAL VERMA\nEXPERIENCE\nRig Administrator\nEDUCATION\nMaster of IT\nCERTIFICATIONS\nFirst Aid",
+        max_lines=2,
+    )
+    assert [chunk["section"] for chunk in chunks] == [
+        "header", "employmentHistory", "education", "certifications"
+    ]
+    assert chunks[1]["lines"][0]["sourceId"] == "p0002"
+    assert chunks[-1]["text"] == "First Aid"
