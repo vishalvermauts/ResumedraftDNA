@@ -165,11 +165,29 @@ def _preserve_source_identity(source: dict, generated: dict | None, description:
             ]
         result["projects"] = projects
 
-    # The master remains complete in its own snapshot. A tailored artifact must
-    # retain identity fields while allowing the model to select relevant skills,
-    # projects, certifications, and leadership records.
-    if source.get("education") and not result.get("education"):
-        result["education"] = source["education"]
+    # Education is an identity-bearing section, not optional narrative. Merge
+    # it from the validated master so a model cannot drop provenance IDs or
+    # silently rewrite a degree, institution, or date.
+    source_education = source.get("education") or []
+    generated_education = generated.get("education") or []
+    if source_education:
+        education = []
+        for original in source_education:
+            candidate = next((item for item in generated_education
+                              if isinstance(item, dict) and original.get("id")
+                              and item.get("id") == original.get("id")), None)
+            if candidate is None:
+                candidate = next((item for item in generated_education
+                                  if isinstance(item, dict)
+                                  and item.get("school") == original.get("school")
+                                  and item.get("degree") == original.get("degree")), None)
+            # Preserve every master education record, with the master as the
+            # authoritative source for protected facts and provenance.
+            merged = dict(original)
+            if isinstance(candidate, dict) and candidate.get("relevantCoursework"):
+                merged["relevantCoursework"] = candidate["relevantCoursework"]
+            education.append(merged)
+        result["education"] = education
     return result
 
 
