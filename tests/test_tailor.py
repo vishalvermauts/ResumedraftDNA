@@ -176,6 +176,33 @@ def test_source_backed_sections_reject_untraceable_records():
         })
 
 
+def test_source_backed_sections_requires_evidence_for_each_claim():
+    from app.ai.validation import ArtifactValidationError, validate_source_backed_sections
+
+    with pytest.raises(ArtifactValidationError):
+        validate_source_backed_sections({
+            "projects": [{
+                "name": "Supported project",
+                "sourceEvidenceIds": ["master:projects:0001"],
+                "description": ["Supported claim"],
+            }]
+        })
+
+
+def test_attach_claim_evidence_preserves_text_shape():
+    from app.ai.validation import attach_claim_evidence, validate_source_backed_sections
+
+    artifact = {
+        "employmentHistory": [{
+            "sourceEvidenceIds": ["master:employmentHistory:0001"],
+            "bulletPoints": ["Supported claim"],
+        }]
+    }
+    result = attach_claim_evidence(artifact)
+    assert result["employmentHistory"][0]["bulletPoints"] == ["Supported claim"]
+    validate_source_backed_sections(result)
+
+
 async def test_tailor_requires_auth(client):
     from app.main import app
     from app.auth import get_current_user

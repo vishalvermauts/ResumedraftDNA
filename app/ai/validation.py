@@ -85,3 +85,35 @@ def validate_source_backed_sections(generated: dict[str, Any]) -> None:
                 raise ArtifactValidationError(
                     f"{section}[{index}] is missing source evidence IDs"
                 )
+            for field in ("bulletPoints", "description"):
+                claims = item.get(field)
+                if not isinstance(claims, list) or not claims:
+                    continue
+                claim_evidence = item.get("claimEvidenceIds")
+                if not isinstance(claim_evidence, list) or len(claim_evidence) != len(claims):
+                    raise ArtifactValidationError(
+                        f"{section}[{index}].{field} is missing one evidence list per generated claim"
+                    )
+                for claim_index, claim_ids in enumerate(claim_evidence, 1):
+                    if not isinstance(claim_ids, list) or not any(isinstance(x, str) and x for x in claim_ids):
+                        raise ArtifactValidationError(
+                            f"{section}[{index}].{field}[{claim_index}] is missing claim evidence IDs"
+                        )
+
+
+def attach_claim_evidence(generated: dict[str, Any]) -> dict[str, Any]:
+    """Attach parent source IDs to each narrative claim without changing text shape."""
+    for section in (
+        "employmentHistory", "projects", "leadershipVolunteering", "certifications",
+    ):
+        for item in _items(generated.get(section)):
+            source_ids = [x for x in (item.get("sourceEvidenceIds") or []) if isinstance(x, str) and x]
+            if not source_ids:
+                continue
+            for field in ("bulletPoints", "description"):
+                claims = item.get(field)
+                if isinstance(claims, list) and claims:
+                    existing = item.get("claimEvidenceIds")
+                    if not isinstance(existing, list) or len(existing) != len(claims):
+                        item["claimEvidenceIds"] = [list(source_ids) for _ in claims]
+    return generated
