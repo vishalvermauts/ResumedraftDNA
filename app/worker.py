@@ -503,7 +503,7 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 source="amazonjobs",
             )
 
-    # 3) Gemini + Search grounding is permanently disabled.
+    # 3) Gemini + Search grounding is permanently disabled; no web-wide fallback.
     if source_allowed("ai_search"):
         print(f"Automation: ai_search source is disabled for uid={uid}; skipping web-wide fallback")
 
@@ -526,17 +526,10 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
 
 @celery_app.task
 def personalized_discovery_task():
-    """Per-user role/location job search. Checks two sources: (1) the shared job_postings
-    corpus that Watchlist's discover_jobs_task builds from real Greenhouse/Lever/JSON-LD
-    scrapes, matched by title/location -- real, structured data; (2) Gemini + Search
-    grounding as a web-wide fallback for roles no watched company has open. Respects each
-    user's configured frequency and the shared free-tier grounding quota. Writes matches
-    directly to the user's Firestore `jobs` collection (foundVia: 'automation'; `source`
-    keeps its true origin -- 'greenhouse'/'lever'/'jsonld'/'ai_search' -- so the existing
-    per-source quality badge in the UI stays accurate regardless of how a job was added).
-    Gemini's own web-wide results additionally get checked against Greenhouse/Lever: if the
-    URL it found belongs to a company on one of those, the real structured job is fetched and
-    swapped in for the AI's summary."""
+    """Run per-user discovery from structured, configured sources only.
+
+    Gemini Search grounding is intentionally not a fallback and is never invoked.
+    """
     loop = asyncio.get_event_loop()
     if db.db is None:
         loop.run_until_complete(db.connect())

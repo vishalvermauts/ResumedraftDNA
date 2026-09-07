@@ -3,9 +3,9 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class ConnectorConfig(BaseModel):
-    type: str # "greenhouse" | "lever" | "jsonld" | "ai_search" | "ashby" | "recruitee" | "smartrecruiters" | "adzuna"
+    type: str # "greenhouse" | "lever" | "jsonld" | "ashby" | "recruitee" | "smartrecruiters" | "adzuna"
     boardToken: Optional[str] = None
-    priority: List[str] = [] # ordered fallback chain, e.g. ["greenhouse", "jsonld", "ai_search"]
+    priority: List[str] = [] # ordered fallback chain across supported structured connectors
     configuration: Dict[str, Any] = {}
 
 class WatchlistResolution(BaseModel):
