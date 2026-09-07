@@ -11,6 +11,20 @@ LD_JSON_RE = re.compile(
 )
 
 
+def parse_application_deadline(value):
+    """Parse schema.org validThrough values into a timezone-aware UTC datetime."""
+    if not value:
+        return None
+    try:
+        from datetime import datetime, timezone
+        parsed = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 class JsonLdConnector(BaseConnector):
     """Scrapes schema.org/JobPosting structured data embedded on a company's own careers page.
     No API key required -- most companies embed this for Google Jobs indexing."""
@@ -68,14 +82,7 @@ class JsonLdConnector(BaseConnector):
 
                 h = canonical_hash("jsonld", str(job_id), self.company_name or "", title, loc_raw, apply_url)
 
-                deadline_raw = entry.get("validThrough")
-                deadline = None
-                if deadline_raw:
-                    try:
-                        from datetime import datetime
-                        deadline = datetime.fromisoformat(str(deadline_raw).replace('Z', '+00:00'))
-                    except Exception:
-                        deadline = None
+                deadline = parse_application_deadline(entry.get("validThrough"))
 
                 jobs.append(JobPosting(
                     canonicalHash=h,
