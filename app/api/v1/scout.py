@@ -109,6 +109,7 @@ async def get_scouted_jobs(
     page: int = 1,
     limit: int = 20,
     q: str = "",
+    sort_by: str = "freshness",
     user: dict = Depends(get_current_user)
 ):
     query_filter = {}
@@ -161,9 +162,18 @@ async def get_scouted_jobs(
     elif personalized:
         return []
 
-    # Fetch jobs from MongoDB with pagination
+    sort_fields = {
+        "freshness": [("postedAt", -1), ("discoveredAt", -1)],
+        "posted": [("postedAt", -1), ("discoveredAt", -1)],
+        "deadline": [("applicationDeadline", 1), ("postedAt", -1)],
+        "discovered": [("discoveredAt", -1)],
+    }
+    sort_spec = sort_fields.get(sort_by, sort_fields["freshness"])
+
+    # Fetch jobs from MongoDB with pagination. The allowlist prevents clients
+    # from turning this endpoint into an arbitrary-field query surface.
     skip = (page - 1) * limit
-    cursor = db.db.job_postings.find(query_filter).sort("discoveredAt", -1).skip(skip).limit(limit)
+    cursor = db.db.job_postings.find(query_filter).sort(sort_spec).skip(skip).limit(limit)
     jobs = await cursor.to_list(length=limit)
     for job in jobs:
         job["id"] = str(job["_id"])

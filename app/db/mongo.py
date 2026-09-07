@@ -88,12 +88,15 @@ class Database:
     async def upsert_job(self, job_data):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
+        # `discoveredAt` is first-seen provenance, not a polling heartbeat. Do
+        # not overwrite it when a connector sees the same posting again.
+        first_seen = job_data.pop("discoveredAt", None) or now
         job_data["lastSeenAt"] = now
         job_data["missedPolls"] = 0
         job_data["status"] = "active"
         return await self.db.job_postings.update_one(
             {"canonicalHash": job_data["canonicalHash"]},
-            {"$set": job_data},
+            {"$set": job_data, "$setOnInsert": {"discoveredAt": first_seen}},
             upsert=True
         )
 
