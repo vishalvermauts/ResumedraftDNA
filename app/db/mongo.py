@@ -36,6 +36,12 @@ class Database:
             await self.db.ai_usage_events.create_index(
                 [("uid", 1), ("createdAt", -1)], name="ai_usage_user_time"
             )
+            await self.db.job_postings.create_index(
+                [("companyId", 1), ("status", 1)], name="job_company_status"
+            )
+            await self.db.job_postings.create_index(
+                [("freshnessAt", -1), ("discoveredAt", -1)], name="job_freshness"
+            )
             await self.backfill_company_ids()
             await self.backfill_freshness_at()
         except Exception as error:
