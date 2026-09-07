@@ -125,15 +125,16 @@ class Database:
             upsert=True
         )
 
-    async def mark_source_empty(self, company_name: str, source: str, now, stale_after: int = 2):
+    async def mark_source_empty(self, company_name: str, source: str, now, stale_after: int = 2, company_id: str | None = None):
         """Advance stale detection only after a healthy empty provider response.
 
         An empty feed cannot prove a role was filled, so this deliberately marks
         postings stale rather than filled. A later observation reactivates them
         through ``upsert_job``.
         """
+        company_id = company_id or canonical_company_id(company_name)
         match = {
-            "companyName": company_name,
+            "$or": [{"companyId": company_id}, {"companyName": company_name}],
             "source": source,
             "status": {"$in": ["active", "stale"]},
         }
@@ -146,14 +147,15 @@ class Database:
             {"$set": {"status": "stale", "staleSince": now}},
         )
 
-    async def mark_source_closed(self, company_name: str, source: str, source_job_ids, now):
+    async def mark_source_closed(self, company_name: str, source: str, source_job_ids, now, company_id: str | None = None):
         """Mark only provider-confirmed closed postings as filled."""
         ids = [str(value) for value in (source_job_ids or []) if value is not None]
         if not ids:
             return
+        company_id = company_id or canonical_company_id(company_name)
         await self.db.job_postings.update_many(
             {
-                "companyName": company_name,
+                "$or": [{"companyId": company_id}, {"companyName": company_name}],
                 "source": source,
                 "sourceJobId": {"$in": ids},
                 "status": {"$nin": ["filled", "expired"]},

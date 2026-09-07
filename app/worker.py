@@ -201,7 +201,10 @@ def discover_jobs_task():
             closed_ids = getattr(connector, "closed_source_job_ids", set())
             if closed_ids:
                 loop.run_until_complete(
-                    db.mark_source_closed(wl.get("companyName") or "", c_type, closed_ids, now)
+                    db.mark_source_closed(
+                        wl.get("companyName") or "", c_type, closed_ids, now,
+                        wl.get("companyId") or canonical_company_id(wl.get("companyName")),
+                    )
                 )
 
             if etag_after:
@@ -268,7 +271,10 @@ def discover_jobs_task():
 
         if chosen_type and chosen_status == SUCCESS_EMPTY:
             loop.run_until_complete(
-                db.mark_source_empty(wl.get("companyName") or "", chosen_type, now)
+                db.mark_source_empty(
+                    wl.get("companyName") or "", chosen_type, now,
+                    company_id=wl.get("companyId") or canonical_company_id(wl.get("companyName")),
+                )
             )
 
         if jobs:

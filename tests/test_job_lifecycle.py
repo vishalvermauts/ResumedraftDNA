@@ -68,6 +68,27 @@ async def test_unconfirmed_or_different_source_close_does_not_fill_job(client):
         await db.db.job_postings.delete_one({"canonicalHash": canonical})
 
 
+async def test_source_close_matches_company_id_across_provider_names(client):
+    from app.db.mongo import db
+
+    canonical = "provider-company-name-regression-test"
+    await db.db.job_postings.delete_one({"canonicalHash": canonical})
+    try:
+        await db.upsert_job({
+            "canonicalHash": canonical, "source": "recruitee", "sourceJobId": "same-1",
+            "companyName": "Amazon Web Services Australia Pty Ltd", "companyId": "amazon",
+            "title": "Administrator", "descriptionText": "Role",
+            "applyUrl": "https://example.com/job", "canonicalUrl": "https://example.com/job",
+        })
+        await db.mark_source_closed(
+            "Amazon", "recruitee", ["same-1"], datetime.now(timezone.utc), company_id="amazon"
+        )
+        saved = await db.db.job_postings.find_one({"canonicalHash": canonical})
+        assert saved["status"] == "filled"
+    finally:
+        await db.db.job_postings.delete_one({"canonicalHash": canonical})
+
+
 async def test_passed_deadline_marks_job_expired_but_not_filled(client):
     from app.db.mongo import db
 
