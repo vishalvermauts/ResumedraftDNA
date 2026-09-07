@@ -12,6 +12,7 @@ from .base import (
     ConnectorBackoffError,
 )
 from ..schemas.job import JobPosting, Location
+from .jsonld import parse_application_deadline
 
 
 class RecruiteeConnector(BaseConnector):
@@ -79,6 +80,12 @@ class RecruiteeConnector(BaseConnector):
                     if p
                 )
             )
+            deadline = parse_application_deadline(
+                offer.get("close_date")
+                or offer.get("closeDate")
+                or offer.get("validThrough")
+                or offer.get("valid_through")
+            )
             h = canonical_hash(
                 "recruitee", job_id, self.board_token or "", title, loc_raw, canonical_url
             )
@@ -92,6 +99,7 @@ class RecruiteeConnector(BaseConnector):
                 descriptionText=description,
                 applyUrl=apply_url,
                 canonicalUrl=canonical_url,
+                applicationDeadline=deadline,
             ))
 
         self.status = SUCCESS_WITH_JOBS if jobs else SUCCESS_EMPTY
