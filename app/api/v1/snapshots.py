@@ -23,7 +23,9 @@ SECTION_INSTRUCTIONS = {
 
 
 async def _extract_source_snapshot(request: MasterSourceIngestRequest) -> dict:
-    chunks = source_section_chunks(request.rawText, max_lines=120)
+    # Keep each Vertex request bounded. Large projects/skills sections can be
+    # syntactically valid but truncated JSON when sent as one request.
+    chunks = source_section_chunks(request.rawText, max_lines=40)
     if not chunks:
         raise HTTPException(status_code=422, detail="Source text contains no extractable sections")
     result: dict = {
@@ -46,17 +48,23 @@ async def _extract_source_snapshot(request: MasterSourceIngestRequest) -> dict:
             "Return an object with an items array. " + instruction + "\n\n"
             f"SOURCE CHUNK {chunk['chunkId']} (lines {chunk['startLine']}-{chunk['endLine']}):\n{chunk['text']}"
         )
-        extracted = await gemini_client.generate_structured(
-            system=(
-                "You are a deterministic resume ingestion service. Return strict JSON only. "
-                "Every item must be directly supported by the supplied source chunk. "
-                "Use empty strings or arrays for unavailable fields."
-            ),
-            user=prompt,
-            schema=MasterChunkExtraction,
-            feature="resume_master_ingestion",
-            max_output_tokens=4096,
-        )
+        try:
+            extracted = await gemini_client.generate_structured(
+                system=(
+                    "You are a deterministic resume ingestion service. Return strict JSON only. "
+                    "Every item must be directly supported by the supplied source chunk. "
+                    "Use empty strings or arrays for unavailable fields."
+                ),
+                user=prompt,
+                schema=MasterChunkExtraction,
+                feature="resume_master_ingestion",
+                max_output_tokens=8192,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Vertex master ingestion failed for {chunk['chunkId']}: {exc}",
+            ) from exc
         if not extracted.items:
             continue
         for item in extracted.items:
