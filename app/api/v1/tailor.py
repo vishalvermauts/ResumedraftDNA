@@ -23,8 +23,13 @@ router = APIRouter()
 
 
 def _firestore_master_lookup_enabled() -> bool:
-    """Only use the repair lookup when a Firestore target is explicitly configured."""
-    return bool(os.getenv("FIRESTORE_EMULATOR_HOST") or os.getenv("ENABLE_FIRESTORE_LOOKUP", "false").lower() == "true")
+    """Only use the repair lookup when it is explicitly enabled.
+
+    An emulator host can be present for unrelated local features; treating its
+    presence as permission to perform a cross-service repair lookup makes a
+    missing Mongo snapshot hang the tailor request when the emulator is down.
+    """
+    return os.getenv("ENABLE_FIRESTORE_LOOKUP", "false").lower() == "true"
 
 def _enforce_cover_letter_word_limit(text: str | None, maximum: int = 350):
     if not isinstance(text, str) or len(text.split()) <= maximum:
