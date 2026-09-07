@@ -60,7 +60,7 @@ def source_section_chunks(raw_text: str, max_lines: int = 120) -> list[dict[str,
                 "startLine": part[0]["line"],
                 "endLine": part[-1]["line"],
                 "lines": part,
-                "text": "\n".join(item["text"] for item in part),
+                "text": "\n".join(item["text"] for item in part if not item.get("isSectionLabel")),
             })
         current = []
 
@@ -70,6 +70,10 @@ def source_section_chunks(raw_text: str, max_lines: int = 120) -> list[dict[str,
         if next_section:
             flush()
             active = next_section
+            # Keep the label for provenance/debugging, but exclude it from the
+            # extraction text so it cannot be re-emitted as a resume fact.
+            current.append({"sourceId": f"p{line_number:04d}", "line": line_number, "text": text, "isSectionLabel": True})
+            continue
         current.append({"sourceId": f"p{line_number:04d}", "line": line_number, "text": text})
     flush()
     return sections
