@@ -22,7 +22,8 @@ jobs:
 
     env:
       MONGODB_URI: mongodb://localhost:27017/resumedraft_test
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Provider liveness is a separate opt-in job; the default suite must not
+      # spend credits or fail because a provider credential has expired.
 
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +38,8 @@ jobs:
       - name: Restore Firebase service account key
         run: echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_B64 }}" | base64 -d > serviceAccountKey.json
 
-      # Includes the Gemini model-liveness checks (real API calls, deterministic pass/fail --
-      # this is the specific test that would have caught this session's deprecated-model
-      # incident before deploy, per the release-gate plan's B.2). A scheduled nightly/prod
-      # canary is a separate follow-up for catching a model retired *after* the last push;
-      # this only catches it at push/PR time.
+      # Live Gemini liveness is intentionally excluded from the default suite. Run it
+      # explicitly in an approved provider canary with RUN_LIVE_GEMINI_TESTS=true.
       - name: Run tests
         run: python -m pytest tests/ -v
 

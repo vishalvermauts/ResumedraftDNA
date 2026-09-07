@@ -6,16 +6,17 @@ gemini-2.0-flash deprecation (every /v1/tailor call 500'd for an unknown period 
 was diagnosed) before a single line of application code needed to change, by simply confirming
 the configured model still exists and is servable.
 
-Run in CI on every PR. Requires GEMINI_API_KEY -- skipped (not failed) when absent, so it
-doesn't block local development without a key.
+This is an explicitly opt-in provider check. Default CI must not make paid provider calls;
+run it separately with RUN_LIVE_GEMINI_TESTS=true and a valid GEMINI_API_KEY.
 """
 import os
 import pytest
 from google import genai
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("GEMINI_API_KEY"),
-    reason="GEMINI_API_KEY not set; skipping live model check"
+    os.getenv("RUN_LIVE_GEMINI_TESTS", "false").lower() != "true"
+    or not os.getenv("GEMINI_API_KEY"),
+    reason="Live Gemini checks are opt-in; set RUN_LIVE_GEMINI_TESTS=true with a valid key",
 )
 
 
