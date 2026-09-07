@@ -37,6 +37,7 @@ class Database:
                 [("uid", 1), ("createdAt", -1)], name="ai_usage_user_time"
             )
             await self.backfill_company_ids()
+            await self.backfill_freshness_at()
         except Exception as error:
             # Older deployments could create duplicate snapshots before the
             # unique constraint existed. Repair identical content records,
@@ -53,6 +54,7 @@ class Database:
                 name="one_active_master_per_user",
             )
             await self.backfill_company_ids()
+            await self.backfill_freshness_at()
         print("Connected to MongoDB")
 
     async def _repair_snapshot_duplicates(self):
@@ -110,6 +112,7 @@ class Database:
         job_data["lastSeenAt"] = now
         job_data["missedPolls"] = 0
         job_data["status"] = "active"
+        job_data["freshnessAt"] = job_data.get("postedAt") or first_seen
         return await self.db.job_postings.update_one(
             {"canonicalHash": job_data["canonicalHash"]},
             {"$set": job_data, "$setOnInsert": {"discoveredAt": first_seen}},
@@ -173,6 +176,24 @@ class Database:
             result = await self.db.job_postings.update_one(
                 {"_id": job["_id"], "$or": [{"companyId": {"$exists": False}}, {"companyId": None}, {"companyId": ""}]},
                 {"$set": {"companyId": canonical_company_id(job.get("companyName"))}},
+            )
+            updated += result.modified_count
+        return updated
+
+    async def backfill_freshness_at(self):
+        """Populate the effective freshness timestamp for legacy job records."""
+        updated = 0
+        cursor = self.db.job_postings.find(
+            {"freshnessAt": {"$exists": False}},
+            {"_id": 1, "postedAt": 1, "discoveredAt": 1},
+        )
+        async for job in cursor:
+            freshness = job.get("postedAt") or job.get("discoveredAt")
+            if freshness is None:
+                continue
+            result = await self.db.job_postings.update_one(
+                {"_id": job["_id"], "freshnessAt": {"$exists": False}},
+                {"$set": {"freshnessAt": freshness}},
             )
             updated += result.modified_count
         return updated

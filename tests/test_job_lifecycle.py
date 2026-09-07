@@ -86,3 +86,23 @@ async def test_job_upsert_assigns_stable_company_id(client):
         assert saved["companyId"] == "acme-sons-pty-ltd"
     finally:
         await db.db.job_postings.delete_one({"canonicalHash": canonical})
+
+
+async def test_job_upsert_uses_posted_time_for_real_freshness(client):
+    from app.db.mongo import db
+
+    canonical = "freshness-regression-test"
+    await db.db.job_postings.delete_one({"canonicalHash": canonical})
+    try:
+        posted = datetime(2026, 1, 5, tzinfo=timezone.utc)
+        discovered = datetime(2026, 2, 5, tzinfo=timezone.utc)
+        await db.upsert_job({
+            "canonicalHash": canonical, "source": "jsonld", "sourceJobId": "fresh-1",
+            "companyName": "Acme", "title": "Engineer", "descriptionText": "Role",
+            "applyUrl": "https://example.com/job", "canonicalUrl": "https://example.com/job",
+            "postedAt": posted, "discoveredAt": discovered,
+        })
+        saved = await db.db.job_postings.find_one({"canonicalHash": canonical})
+        assert saved["freshnessAt"] == posted.replace(tzinfo=None)
+    finally:
+        await db.db.job_postings.delete_one({"canonicalHash": canonical})

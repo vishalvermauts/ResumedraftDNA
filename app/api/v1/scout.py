@@ -169,7 +169,7 @@ async def get_scouted_jobs(
         return []
 
     sort_fields = {
-        "freshness": [("postedAt", -1), ("discoveredAt", -1)],
+        "freshness": [("freshnessAt", -1), ("discoveredAt", -1)],
         "posted": [("postedAt", -1), ("discoveredAt", -1)],
         "deadline": [("applicationDeadline", 1), ("postedAt", -1)],
         "discovered": [("discoveredAt", -1)],

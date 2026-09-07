@@ -31,6 +31,7 @@ class JobPosting(BaseModel):
     canonicalUrl: str
     postedAt: Optional[datetime] = None
     discoveredAt: datetime = Field(default_factory=datetime.utcnow)
+    freshnessAt: Optional[datetime] = None
     lastSeenAt: datetime = Field(default_factory=datetime.utcnow)
     missedPolls: int = 0
     status: str = "active" # "active", "stale", "expired", "filled"
