@@ -408,7 +408,7 @@ async def tailor_resume(
     try:
         if tailored_resume:
             validate_protected_facts(source_resume, tailored_resume)
-            validate_source_backed_sections(tailored_resume)
+            validate_source_backed_sections(tailored_resume, master_data)
         if type == "coverLetter":
             validate_cover_letter(cover_letter)
     except ArtifactValidationError as exc:

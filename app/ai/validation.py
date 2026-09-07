@@ -8,6 +8,8 @@ as a successful artifact.
 from __future__ import annotations
 
 from typing import Any
+import json
+import re
 
 
 class ArtifactValidationError(ValueError):
@@ -67,7 +69,38 @@ def validate_cover_letter(text: str | None, minimum: int = 250, maximum: int = 3
         )
 
 
-def validate_source_backed_sections(generated: dict[str, Any]) -> None:
+_CLAIM_STOPWORDS = {
+    "about", "after", "again", "also", "because", "being", "could", "from",
+    "have", "into", "more", "most", "over", "such", "than", "that", "their",
+    "there", "these", "they", "this", "through", "using", "were", "which", "with",
+}
+
+
+def _meaningful_tokens(value: Any) -> set[str]:
+    return {
+        token for token in re.findall(r"[a-z0-9]+", str(value or "").lower())
+        if len(token) >= 4 and token not in _CLAIM_STOPWORDS
+    }
+
+
+def _source_evidence_map(source: dict[str, Any] | None) -> dict[str, str]:
+    evidence: dict[str, str] = {}
+    if not isinstance(source, dict):
+        return evidence
+    for value in source.values():
+        if not isinstance(value, list):
+            continue
+        for item in value:
+            if not isinstance(item, dict):
+                continue
+            text = json.dumps(item, ensure_ascii=True)
+            for evidence_id in item.get("sourceEvidenceIds") or []:
+                if isinstance(evidence_id, str) and evidence_id:
+                    evidence[evidence_id] = text
+    return evidence
+
+
+def validate_source_backed_sections(generated: dict[str, Any], source: dict[str, Any] | None = None) -> None:
     """Require selected structured records to retain their master evidence IDs.
 
     Narrative bullets are allowed to be paraphrased, but they must remain
@@ -75,6 +108,7 @@ def validate_source_backed_sections(generated: dict[str, Any]) -> None:
     existing public payload while preventing untraceable records from being
     persisted.
     """
+    evidence_map = _source_evidence_map(source)
     for section in (
         "employmentHistory", "education", "projects", "certifications",
         "leadershipVolunteering", "technicalSkills", "skills",
@@ -99,6 +133,13 @@ def validate_source_backed_sections(generated: dict[str, Any]) -> None:
                         raise ArtifactValidationError(
                             f"{section}[{index}].{field}[{claim_index}] is missing claim evidence IDs"
                         )
+                    if evidence_map:
+                        claim_tokens = _meaningful_tokens(claims[claim_index - 1])
+                        cited_text = " ".join(evidence_map.get(evidence_id, "") for evidence_id in claim_ids)
+                        if not cited_text or not claim_tokens.intersection(_meaningful_tokens(cited_text)):
+                            raise ArtifactValidationError(
+                                f"{section}[{index}].{field}[{claim_index}] is not supported by cited source evidence"
+                            )
 
 
 def attach_claim_evidence(generated: dict[str, Any]) -> dict[str, Any]:

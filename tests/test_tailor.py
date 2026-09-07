@@ -203,6 +203,38 @@ def test_attach_claim_evidence_preserves_text_shape():
     validate_source_backed_sections(result)
 
 
+def test_claim_support_gate_rejects_unrelated_cited_text():
+    from app.ai.validation import ArtifactValidationError, validate_source_backed_sections
+
+    source = {
+        "employmentHistory": [{
+            "sourceEvidenceIds": ["source:employmentHistory:0001"],
+            "bulletPoints": ["Processed SAP service entries and travel bookings."],
+        }]
+    }
+    supported = {
+        "employmentHistory": [{
+            "sourceEvidenceIds": ["source:employmentHistory:0001"],
+            "bulletPoints": ["Processed SAP travel workflows."],
+            "claimEvidenceIds": [["source:employmentHistory:0001"]],
+        }]
+    }
+    validate_source_backed_sections(supported, source)
+    unsupported = {
+        "employmentHistory": [{
+            "sourceEvidenceIds": ["source:employmentHistory:0001"],
+            "bulletPoints": ["Managed corporate litigation strategy."],
+            "claimEvidenceIds": [["source:employmentHistory:0001"]],
+        }]
+    }
+    try:
+        validate_source_backed_sections(unsupported, source)
+    except ArtifactValidationError as error:
+        assert "not supported" in str(error)
+    else:
+        raise AssertionError("unrelated cited claim was accepted")
+
+
 async def test_tailor_requires_auth(client):
     from app.main import app
     from app.auth import get_current_user
