@@ -503,10 +503,6 @@ def _run_discovery_for_one(s, loop, fs, now, force=False):
                 source="amazonjobs",
             )
 
-    # 3) Gemini + Search grounding is permanently disabled; no web-wide fallback.
-    if source_allowed("ai_search"):
-        print(f"Automation: ai_search source is disabled for uid={uid}; skipping web-wide fallback")
-
     loop.run_until_complete(
         db.db.automation_settings.update_one({"_id": s["_id"]}, {"$set": {"lastRunAt": now}})
     )
