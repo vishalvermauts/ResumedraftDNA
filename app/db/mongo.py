@@ -121,4 +121,19 @@ class Database:
             {"$set": {"status": "stale", "staleSince": now}},
         )
 
+    async def mark_source_closed(self, company_name: str, source: str, source_job_ids, now):
+        """Mark only provider-confirmed closed postings as filled."""
+        ids = [str(value) for value in (source_job_ids or []) if value is not None]
+        if not ids:
+            return
+        await self.db.job_postings.update_many(
+            {
+                "companyName": company_name,
+                "source": source,
+                "sourceJobId": {"$in": ids},
+                "status": {"$nin": ["filled", "expired"]},
+            },
+            {"$set": {"status": "filled", "filledAt": now}},
+        )
+
 db = Database()

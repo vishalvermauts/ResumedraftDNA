@@ -90,6 +90,9 @@ class BaseConnector:
         self.status: Optional[str] = None
         # ETag observed on the provider's last response, if the provider supports it.
         self.etag: Optional[str] = None
+        # Source-proven closure IDs. Most public feeds only return open jobs;
+        # connectors must populate this only when the provider says closed.
+        self.closed_source_job_ids: set[str] = set()
 
     async def fetch_jobs(self, etag: Optional[str] = None) -> List[Any]:
         raise NotImplementedError("fetch_jobs must be implemented")

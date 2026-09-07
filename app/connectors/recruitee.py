@@ -26,6 +26,7 @@ class RecruiteeConnector(BaseConnector):
         self.base_url = f"https://{self.board_token}.recruitee.com/api/offers/"
 
     async def fetch_jobs(self, etag=None):
+        self.closed_source_job_ids = set()
         headers = default_headers()
         if etag:
             headers["If-None-Match"] = etag
@@ -62,6 +63,8 @@ class RecruiteeConnector(BaseConnector):
         jobs = []
         for offer in data.get("offers", []):
             if offer.get("status") in ("closed", "draft"):
+                if offer.get("status") == "closed" and offer.get("id") is not None:
+                    self.closed_source_job_ids.add(str(offer.get("id")))
                 continue
             job_id = str(offer.get("id"))
             title = offer.get("title")

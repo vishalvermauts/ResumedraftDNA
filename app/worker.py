@@ -197,6 +197,12 @@ def discover_jobs_task():
                 print(f"Backing off ({c_type}) for {wl.get('companyName')}: {exc}")
                 continue
 
+            closed_ids = getattr(connector, "closed_source_job_ids", set())
+            if closed_ids:
+                loop.run_until_complete(
+                    db.mark_source_closed(wl.get("companyName") or "", c_type, closed_ids, now)
+                )
+
             if etag_after:
                 connector_etags[c_type] = etag_after
 
