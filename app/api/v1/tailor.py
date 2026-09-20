@@ -3,7 +3,7 @@ from bson import ObjectId
 from ...auth import get_current_user
 from ...db.mongo import db
 from ...ai.gemini import gemini_client
-from ...schemas.artifact import TailoredArtifact
+from ...schemas.artifact import CoverLetterArtifact, TailoredArtifact
 from datetime import datetime
 from pydantic import BaseModel
 from ...ai.hybrid_tailor import analyze_resume, build_hybrid_prompt
@@ -420,7 +420,10 @@ async def tailor_resume(
         result = await gemini_client.generate_structured(
             system=system,
             user=prompt,
-            schema=TailoredArtifact,
+            # The cover-letter word contract belongs inside the provider retry
+            # boundary. An empty response should trigger a fresh Vertex call,
+            # not a completed run that only fails after generation.
+            schema=CoverLetterArtifact if type == "coverLetter" else TailoredArtifact,
             feature=feature_label,
             thinking_level="medium",
             uid=user["uid"],
