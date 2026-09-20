@@ -20,6 +20,14 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _has_tailoring_evidence(snapshot: dict) -> bool:
+    data = snapshot.get("structuredData") or {}
+    for section in ("employmentHistory", "projects", "leadershipVolunteering"):
+        if any(isinstance(item, dict) and any(item.values()) for item in data.get(section, [])):
+            return True
+    return False
+
+
 async def _set_stage(run_id: ObjectId, name: str, status: str, **extra):
     stage = {"name": name, "status": status, "updatedAt": _now(), **extra}
     await db.db.tailoring_runs.update_one(
@@ -40,6 +48,11 @@ async def create_tailoring_run(
         # distinct status lets the client direct the user to Documents instead
         # of recording a misleading generation failure.
         raise HTTPException(status_code=409, detail="No active master resume snapshot found. Select a master resume in Documents first.")
+    if not _has_tailoring_evidence(snapshot):
+        raise HTTPException(
+            status_code=422,
+            detail="The active master resume has no work, project, or leadership evidence. Complete the master resume before tailoring.",
+        )
 
     run = {
         "uid": user["uid"],
