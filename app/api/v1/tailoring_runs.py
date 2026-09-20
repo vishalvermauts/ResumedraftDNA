@@ -36,7 +36,10 @@ async def create_tailoring_run(
 ):
     snapshot = await db.db.resume_snapshots.find_one({"uid": user["uid"], "active": True})
     if not snapshot:
-        raise HTTPException(status_code=404, detail="No active master resume snapshot found")
+        # This is a recoverable precondition, not an absent API route.  A
+        # distinct status lets the client direct the user to Documents instead
+        # of recording a misleading generation failure.
+        raise HTTPException(status_code=409, detail="No active master resume snapshot found. Select a master resume in Documents first.")
 
     run = {
         "uid": user["uid"],
