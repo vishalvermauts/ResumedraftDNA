@@ -27,7 +27,7 @@ async def test_tailor_resume_generates_and_saves_artifact(client):
         "active": True,
     })
 
-    fake_result = TailoredArtifact(tailoredResume='{"personalDetails": {"fullName": "Test User"}}', coverLetter=None)
+    fake_result = TailoredArtifact(tailoredResume={"personalDetails": {"fullName": "Test User"}}, coverLetter=None)
     with patch("app.api.v1.tailor.gemini_client.generate_structured", new=AsyncMock(return_value=fake_result)):
         # Job ID intentionally shaped like a Firestore ID (not a valid Mongo ObjectId hex
         # string) -- regression guard for the ObjectId(job_id) bug found this session.
@@ -92,7 +92,7 @@ async def test_hybrid_mode_sends_ranked_evidence_and_labels_response(client):
     async def capture_call(**kwargs):
         captured.update(kwargs)
         return TailoredArtifact(
-            tailoredResume='{"personalDetails": {"fullName": "Test User"}}',
+            tailoredResume={"personalDetails": {"fullName": "Test User"}},
             coverLetter=None,
         )
 

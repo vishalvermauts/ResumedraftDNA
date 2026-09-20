@@ -105,6 +105,10 @@ class GeminiClient:
                     raise ValueError("Vertex structured generation was truncated: MAX_TOKENS")
                 if not getattr(response, "text", None):
                     raise ValueError("Vertex structured generation returned no text")
+                # Parsing is part of a successful provider response. Keeping it
+                # inside the retry boundary lets a malformed JSON candidate be
+                # regenerated instead of crashing a whole certification run.
+                parsed_response = schema.model_validate_json(response.text)
                 usage = getattr(response, "usage_metadata", None)
                 usage_dict = {
                     "promptTokenCount": getattr(usage, "prompt_token_count", None),
@@ -126,7 +130,7 @@ class GeminiClient:
                     )
                     raise
                 await asyncio.sleep(2 ** attempt)
-        return schema.model_validate_json(response.text)
+        return parsed_response
 
     async def generate_grounded(self, prompt: str, feature: str = "search_grounding") -> str:
         raise RuntimeError("Gemini grounding is permanently disabled")

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from bson import ObjectId
 from ...auth import get_current_user
 from ...db.mongo import db
 from ...ai.gemini import gemini_client
@@ -69,8 +70,10 @@ def _local_fallback(snapshot: dict, description: str, artifact_type: str):
     return data, None
 
 
-def _parse_model_json(value: str):
+def _parse_model_json(value: dict | str):
     """Accept a JSON object wrapped in harmless model prose, but not invalid JSON."""
+    if isinstance(value, dict):
+        return value
     text = (value or '').strip().removeprefix('```json').removeprefix('```').strip()
     # Models occasionally emit raw control bytes inside JSON strings. They are
     # invalid JSON and have no useful semantic content in a resume artifact.
@@ -225,8 +228,11 @@ def _filter_selected_sections(source: dict, generated: dict, description: str):
                     if isinstance(item.get("description"), list) and item["description"]:
                         merged["description"] = item["description"]
                 elif section == "leadershipVolunteering":
-                    if isinstance(item.get("bulletPoints"), list) and item["bulletPoints"]:
-                        merged["bulletPoints"] = item["bulletPoints"]
+                    # Relevance selects the leadership record, but its factual
+                    # narrative remains verbatim source evidence. This avoids
+                    # subtle social-impact overclaims that cannot be proven by
+                    # a generic parent-level citation.
+                    merged["bulletPoints"] = list(original.get("bulletPoints") or [])
                 allowed.append(merged)
         generated[section] = allowed[:limit]
         # Leadership/community evidence is required when the job asks for
@@ -241,7 +247,7 @@ def _filter_selected_sections(source: dict, generated: dict, description: str):
             )
             generated[section] = [
                 {**item, "bulletPoints": (item.get("bulletPoints") or [])[:2]}
-                for item in ranked[:2]
+                for item in ranked[:3]
             ]
         if section == "certifications" and not generated[section]:
             relevant = [
@@ -251,6 +257,20 @@ def _filter_selected_sections(source: dict, generated: dict, description: str):
             # Keep at least one verified credential when the source has
             # certifications; omission must be an explicit, auditable choice.
             generated[section] = (relevant or source_items)[:2]
+        if section == "certifications" and generated[section]:
+            # Safety/compliance roles should consistently surface the most
+            # role-relevant verified credentials even when Vertex selects a
+            # different valid subset on another run.
+            safety_signal = bool(jd_tokens & {"safety", "compliance", "emergency", "offshore", "risk"})
+            if safety_signal:
+                ranked_certifications = sorted(
+                    source_items,
+                    key=lambda item: (
+                        not bool(_relevance_tokens(json.dumps(item)) & jd_tokens),
+                        not bool(_relevance_tokens(json.dumps(item)) & {"control", "work", "first", "aid", "imist", "safety"}),
+                    ),
+                )
+                generated[section] = ranked_certifications[:3]
     return generated
 
 
@@ -298,10 +318,16 @@ async def tailor_resume(
     req: TailorRequest,
     type: str = "resume",
     mode: str = "ai",
+    snapshot_id: str | None = None,
     user: dict = Depends(get_current_user)
 ):
     # Fetch active resume snapshot
-    resume_snapshot = await db.db.resume_snapshots.find_one({"uid": user["uid"], "active": True})
+    snapshot_query = {"uid": user["uid"], "active": True}
+    if snapshot_id:
+        if not ObjectId.is_valid(snapshot_id):
+            raise HTTPException(status_code=404, detail="Frozen master resume snapshot not found")
+        snapshot_query = {"uid": user["uid"], "_id": ObjectId(snapshot_id)}
+    resume_snapshot = await db.db.resume_snapshots.find_one(snapshot_query)
     if not resume_snapshot:
         # Repair legacy/imported accounts where Firestore is marked master but
         # the backend snapshot was never synchronized.
@@ -327,7 +353,7 @@ async def tailor_resume(
             await db.db.resume_snapshots.insert_one(resume_snapshot)
         else:
             raise HTTPException(status_code=404, detail="No active resume snapshot found")
-    else:
+    elif not snapshot_id:
         # Keep an existing snapshot aligned when the user replaces or edits the
         # Firestore-marked master after the first synchronization.
         try:
@@ -372,6 +398,14 @@ async def tailor_resume(
             detail="System prompt configuration missing or unreadable on backend."
         )
 
+    artifact_contract = (
+        "\n\nReturn exactly one JSON object matching this API contract. "
+        "For a resume request: {\"tailoredResume\": {<resume fields>}, \"coverLetter\": null}. "
+        "For a cover-letter request: {\"tailoredResume\": null, \"coverLetter\": \"250-350 word letter\"}. "
+        "Never encode tailoredResume as a JSON string and never use Markdown fences."
+    )
+    system = system + artifact_contract
+
     hybrid_report = {"mode": "ai-only", "jobConcepts": [], "items": []}
     source_resume = add_source_provenance(resume_snapshot["structuredData"])
     working_resume = source_resume
@@ -404,7 +438,7 @@ async def tailor_resume(
         fallback_snapshot = {**resume_snapshot, "structuredData": working_resume}
         tailored_resume, cover_letter = _local_fallback(fallback_snapshot, req.description, type)
         result = TailoredArtifact(
-            tailoredResume=json.dumps(tailored_resume) if tailored_resume is not None else None,
+            tailoredResume=tailored_resume,
             coverLetter=cover_letter,
         )
 

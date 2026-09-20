@@ -7,6 +7,7 @@ from .api.v1.watchlist import router as watchlist_router
 from .api.v1.tailor import router as tailor_router
 from .api.v1.automation import router as automation_router
 from .api.v1.ai_usage import router as ai_usage_router
+from .api.v1.tailoring_runs import router as tailoring_runs_router
 from .db.mongo import db
 import os
 
@@ -41,6 +42,7 @@ app.include_router(watchlist_router, prefix="/v1")
 app.include_router(tailor_router, prefix="/v1")
 app.include_router(automation_router, prefix="/v1")
 app.include_router(ai_usage_router, prefix="/v1")
+app.include_router(tailoring_runs_router, prefix="/v1")
 
 @app.get("/")
 def read_root():

@@ -36,6 +36,12 @@ class Database:
             await self.db.ai_usage_events.create_index(
                 [("uid", 1), ("createdAt", -1)], name="ai_usage_user_time"
             )
+            await self.db.tailoring_runs.create_index(
+                [("uid", 1), ("createdAt", -1)], name="tailoring_run_user_time"
+            )
+            await self.db.tailoring_runs.create_index(
+                [("status", 1), ("updatedAt", -1)], name="tailoring_run_status"
+            )
             await self.db.job_postings.create_index(
                 [("companyId", 1), ("status", 1)], name="job_company_status"
             )

@@ -96,8 +96,25 @@ def _source_evidence_map(source: dict[str, Any] | None) -> dict[str, str]:
             text = json.dumps(item, ensure_ascii=True)
             for evidence_id in item.get("sourceEvidenceIds") or []:
                 if isinstance(evidence_id, str) and evidence_id:
-                    evidence[evidence_id] = text
+                    # A source paragraph can legitimately support adjacent
+                    # records (for example two volunteering entries). Keep all
+                    # matching records instead of overwriting earlier evidence.
+                    evidence[evidence_id] = "\n".join(
+                        part for part in (evidence.get(evidence_id), text) if part
+                    )
     return evidence
+
+
+def _claim_is_supported(claim: Any, cited_text: Any) -> bool:
+    """Use one deterministic support threshold for repair and final validation."""
+    claim_tokens = _meaningful_tokens(claim)
+    cited_tokens = _meaningful_tokens(cited_text)
+    required_overlap = 1 if len(claim_tokens) <= 3 else 2
+    return bool(cited_text) and len(claim_tokens.intersection(cited_tokens)) >= required_overlap
+
+
+def _normalise_identity(value: Any) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", str(value or "").lower()))
 
 
 def validate_source_backed_sections(generated: dict[str, Any], source: dict[str, Any] | None = None) -> None:
@@ -134,9 +151,11 @@ def validate_source_backed_sections(generated: dict[str, Any], source: dict[str,
                             f"{section}[{index}].{field}[{claim_index}] is missing claim evidence IDs"
                         )
                     if evidence_map:
-                        claim_tokens = _meaningful_tokens(claims[claim_index - 1])
                         cited_text = " ".join(evidence_map.get(evidence_id, "") for evidence_id in claim_ids)
-                        if not cited_text or not claim_tokens.intersection(_meaningful_tokens(cited_text)):
+                        # A shared generic token (for example "SAP") cannot prove an
+                        # otherwise new responsibility. Short claims need one concrete
+                        # overlap; longer claims need at least two source-supported terms.
+                        if not _claim_is_supported(claims[claim_index - 1], cited_text):
                             raise ArtifactValidationError(
                                 f"{section}[{index}].{field}[{claim_index}] is not supported by cited source evidence"
                             )
@@ -179,7 +198,17 @@ def repair_unsupported_claims(generated: dict[str, Any], source: dict[str, Any] 
             identity = item.get("id") or item.get("name") or item.get("organization")
             original = next((candidate for candidate in source_items
                              if isinstance(candidate, dict) and identity and
-                             (candidate.get("id") == identity or candidate.get("name") == identity or candidate.get("organization") == identity)), None)
+                             (candidate.get("id") == identity
+                              or candidate.get("name") == identity
+                              or _normalise_identity(candidate.get("organization")) == _normalise_identity(identity))), None)
+            if original is None and section == "leadershipVolunteering":
+                # Models sometimes omit the stable id while preserving the
+                # role/organisation pair. Match that pair before validation so
+                # an unsupported paraphrase can be restored from the master.
+                original = next((candidate for candidate in source_items
+                                 if isinstance(candidate, dict)
+                                 and _normalise_identity(candidate.get("organization")) == _normalise_identity(item.get("organization"))
+                                 and _normalise_identity(candidate.get("role")) == _normalise_identity(item.get("role"))), None)
             if not original:
                 continue
             for field in ("bulletPoints", "description"):
@@ -192,7 +221,7 @@ def repair_unsupported_claims(generated: dict[str, Any], source: dict[str, Any] 
                 for index, claim in enumerate(claims):
                     claim_ids = cited_ids[index] if index < len(cited_ids) and isinstance(cited_ids[index], list) else item.get("sourceEvidenceIds") or []
                     cited_text = " ".join(evidence_map.get(evidence_id, "") for evidence_id in claim_ids)
-                    if not cited_text or not _meaningful_tokens(claim).intersection(_meaningful_tokens(cited_text)):
+                    if not _claim_is_supported(claim, cited_text):
                         repaired.append(source_claims[index] if index < len(source_claims) else source_claims[0])
                     else:
                         repaired.append(claim)
