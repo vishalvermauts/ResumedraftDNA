@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+serviceAccountKey.json
+resumedraft-vertex-key.json
+*.json
+celerybeat-schedule*
+__pycache__
+*.pyc
+.pytest_cache
+tests
+*.log
