@@ -10,7 +10,10 @@ async def test_tailoring_run_freezes_active_snapshot_and_records_artifacts(clien
         "firestoreResumeId": "master-1",
         "version": 1,
         "contentHash": "sha256:master-content",
-        "structuredData": {"personalDetails": {"fullName": "Test User"}},
+        "structuredData": {
+            "personalDetails": {"fullName": "Test User"},
+            "employmentHistory": [{"jobTitle": "Coordinator", "company": "Co", "bulletPoints": ["Led project"]}]
+        },
         "active": True,
     })
 
@@ -44,7 +47,11 @@ async def test_tailoring_run_records_failure_without_losing_run_history(client):
 
     await db.db.resume_snapshots.insert_one({
         "uid": "test-uid-12345", "firestoreResumeId": "master-1", "version": 1,
-        "structuredData": {"personalDetails": {"fullName": "Test User"}}, "active": True,
+        "structuredData": {
+            "personalDetails": {"fullName": "Test User"},
+            "employmentHistory": [{"jobTitle": "Coordinator", "company": "Co", "bulletPoints": ["Led project"]}]
+        },
+        "active": True,
     })
 
     with patch("app.api.v1.tailoring_runs.tailor_resume", new=AsyncMock(side_effect=RuntimeError("Vertex timeout"))):

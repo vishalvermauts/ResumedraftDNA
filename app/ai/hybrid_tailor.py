@@ -85,6 +85,15 @@ def analyze_resume(resume, job_description):
     if isinstance(projects, list):
         result["projects"] = ranked(projects, "project", "projects")
 
+    # Deterministically rank certifications and volunteering with relevance scoring
+    certifications = result.get("certifications") if isinstance(result, dict) else None
+    if isinstance(certifications, list):
+        result["certifications"] = ranked(certifications, "certification", "certifications")
+
+    volunteering = result.get("leadershipVolunteering") if isinstance(result, dict) else None
+    if isinstance(volunteering, list):
+        result["leadershipVolunteering"] = ranked(volunteering, "leadership-volunteering", "leadershipVolunteering")
+
     # Keep each job and every bullet, but surface the most relevant evidence first.
     employment = result.get("employmentHistory") if isinstance(result, dict) else None
     if isinstance(employment, list):
