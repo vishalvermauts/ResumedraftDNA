@@ -21,7 +21,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _configured_model() -> str:
-    return os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 def test_configured_model_exists_and_is_accessible():
