@@ -70,14 +70,14 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           ssh -v -i ~/.ssh/deploy_key ubuntu@"$EC2_HOST" \
-            "cd ~/app && git pull origin master && sudo docker compose up -d --build api worker beat"
+            "cd ~/app && git pull origin master && sudo docker compose up -d --build"
 
       - name: Post-deploy health check
         env:
           EC2_HOST: 52.0.119.87
         run: |
           for attempt in $(seq 1 10); do
-            if curl -sf "http://$EC2_HOST:8000/v1/health" > /dev/null; then
+            if curl -sf "http://$EC2_HOST/v1/health" > /dev/null || curl -sf "http://$EC2_HOST:8000/v1/health" > /dev/null; then
               echo "Health check passed on attempt $attempt"
               exit 0
             fi

@@ -1,0 +1,11 @@
+{
+    email admin@resumedraft.app
+}
+
+52.0.119.87.sslip.io {
+    reverse_proxy api:8000
+}
+
+:80 {
+    reverse_proxy api:8000
+}
