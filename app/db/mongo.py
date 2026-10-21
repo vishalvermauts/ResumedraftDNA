@@ -48,6 +48,9 @@ class Database:
             await self.db.job_postings.create_index(
                 [("freshnessAt", -1), ("discoveredAt", -1)], name="job_freshness"
             )
+            await self.db.job_postings.create_index(
+                [("canonicalHash", 1)], unique=True, sparse=True, name="job_canonical_hash"
+            )
             await self.backfill_company_ids()
             await self.backfill_freshness_at()
         except Exception as error:

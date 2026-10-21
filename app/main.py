@@ -17,7 +17,15 @@ configured_origins = os.getenv(
 )
 allowed_origins = [origin.strip() for origin in configured_origins.split(",") if origin.strip()]
 
-app = FastAPI(title="ResumeDraft DNA API")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.connect()
+    yield
+    await db.close()
+
+app = FastAPI(title="ResumeDraft DNA API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,14 +34,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def startup():
-    await db.connect()
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db.close()
 
 app.include_router(health_router, prefix="/v1")
 app.include_router(snapshots_router, prefix="/v1")

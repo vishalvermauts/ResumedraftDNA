@@ -4,12 +4,24 @@ from firebase_admin import auth, credentials
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-# Initialize Firebase Admin
-cred = credentials.Certificate("serviceAccountKey.json") # Need to ensure this is present in prod
-firebase_admin.initialize_app(
-    cred,
-    options={"projectId": os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")},
-)
+# Initialize Firebase Admin defensively
+sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not sa_path or not os.path.exists(sa_path):
+    for candidate in [
+        "serviceAccountKey.json",
+        os.path.join(os.path.dirname(__file__), "..", "serviceAccountKey.json"),
+        os.path.join(os.getcwd(), "ResumedraftDNA", "serviceAccountKey.json"),
+    ]:
+        if os.path.exists(candidate):
+            sa_path = candidate
+            break
+
+if sa_path and os.path.exists(sa_path) and not firebase_admin._apps:
+    cred = credentials.Certificate(sa_path)
+    firebase_admin.initialize_app(
+        cred,
+        options={"projectId": os.getenv("GOOGLE_CLOUD_PROJECT", "resumedraft")},
+    )
 
 security = HTTPBearer()
 

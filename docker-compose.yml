@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   api:
     build: .
@@ -23,13 +22,17 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
       - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
       - GEMINI_MODEL=gemini-2.5-flash
+      - HELIX_GATEWAY_KEY=${HELIX_GATEWAY_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HELIX_GATEWAY_BASE_URL=${HELIX_GATEWAY_BASE_URL:-https://router.helixengine.app}
+      - HELIX_MODEL=${HELIX_MODEL:-gemini-pro}
       - ENABLE_GEMINI_GROUNDING=false
       - ALLOW_TAILOR_FALLBACK=false
       - APP_VERSION=${APP_VERSION:-local}
   mongo:
     image: mongo:7.0
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
   redis:
@@ -56,6 +59,10 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
       - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
       - GEMINI_MODEL=gemini-2.5-flash
+      - HELIX_GATEWAY_KEY=${HELIX_GATEWAY_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HELIX_GATEWAY_BASE_URL=${HELIX_GATEWAY_BASE_URL:-https://router.helixengine.app}
+      - HELIX_MODEL=${HELIX_MODEL:-gemini-pro}
       - ENABLE_GEMINI_GROUNDING=false
       - ALLOW_TAILOR_FALLBACK=false
       - APP_VERSION=${APP_VERSION:-local}
@@ -81,6 +88,10 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/serviceAccountKey.json
       - VERTEX_ACCESS_TOKEN=${VERTEX_ACCESS_TOKEN:-}
       - GEMINI_MODEL=gemini-2.5-flash
+      - HELIX_GATEWAY_KEY=${HELIX_GATEWAY_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - HELIX_GATEWAY_BASE_URL=${HELIX_GATEWAY_BASE_URL:-https://router.helixengine.app}
+      - HELIX_MODEL=${HELIX_MODEL:-gemini-pro}
       - ENABLE_GEMINI_GROUNDING=false
       - APP_VERSION=${APP_VERSION:-local}
 

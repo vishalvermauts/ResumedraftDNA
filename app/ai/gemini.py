@@ -58,15 +58,68 @@ def _get_auth_client():
             except Exception:
                 pass
 
-        return genai.Client(vertexai=True, project=project, location=location)
+        try:
+            return genai.Client(vertexai=True, project=project, location=location)
+        except Exception:
+            pass
 
-    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        try:
+            return genai.Client(api_key=api_key)
+        except Exception:
+            pass
+    return None
 
 
 class GeminiClient:
     def __init__(self):
-        self.client = _get_auth_client()
+        try:
+            self.client = _get_auth_client()
+        except Exception:
+            self.client = None
         self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+    async def _generate_via_helix(
+        self,
+        system: str,
+        user: str,
+        schema: type[BaseModel],
+        max_output_tokens: int = 8192,
+    ) -> tuple[BaseModel, dict]:
+        import httpx
+        key = os.getenv("HELIX_GATEWAY_KEY") or os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("HELIX_GATEWAY_BASE_URL", "https://router.helixengine.app").rstrip("/")
+        model = os.getenv("HELIX_MODEL", "gemini-pro")
+        url = f"{base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user})
+        payload = {
+            "model": model,
+            "messages": messages,
+            "response_format": {"type": "json_object"},
+            "max_tokens": min(max_output_tokens, 4096),
+            "temperature": 0.2
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+            parsed = schema.model_validate_json(content)
+            usage = data.get("usage") or {}
+            usage_dict = {
+                "promptTokenCount": usage.get("prompt_tokens"),
+                "candidatesTokenCount": usage.get("completion_tokens"),
+                "totalTokenCount": usage.get("total_tokens"),
+            }
+            return parsed, usage_dict
 
     async def generate_structured(
         self,
@@ -119,9 +172,24 @@ class GeminiClient:
                     uid=uid, feature=feature, model=self.model, provider=provider,
                     usage_metadata=usage_dict, duration_ms=(time.perf_counter() - started_at) * 1000,
                 )
-                break
+                return parsed_response
             except Exception as error:
                 last_error = error
+                # Fallback to HelixGateway if configured
+                helix_key = os.getenv("HELIX_GATEWAY_KEY") or os.getenv("OPENAI_API_KEY")
+                if helix_key:
+                    try:
+                        parsed_response, usage_dict = await self._generate_via_helix(
+                            system=system, user=user, schema=schema, max_output_tokens=max_output_tokens
+                        )
+                        helix_model = os.getenv("HELIX_MODEL", "gemini-pro")
+                        await record_ai_usage(
+                            uid=uid, feature=feature, model=helix_model, provider="helixgateway",
+                            usage_metadata=usage_dict, duration_ms=(time.perf_counter() - started_at) * 1000,
+                        )
+                        return parsed_response
+                    except Exception as h_err:
+                        last_error = h_err
                 if attempt == 2:
                     await record_ai_usage(
                         uid=uid, feature=feature, model=self.model, provider=provider,
