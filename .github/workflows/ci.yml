@@ -60,7 +60,7 @@ jobs:
       - name: Deploy over SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          EC2_HOST: 98.80.105.34
+          EC2_HOST: 52.0.119.87
         run: |
           mkdir -p ~/.ssh
           # Strip CRLF defensively -- the secret may have been set from a Windows machine
@@ -74,7 +74,7 @@ jobs:
 
       - name: Post-deploy health check
         env:
-          EC2_HOST: 98.80.105.34
+          EC2_HOST: 52.0.119.87
         run: |
           for attempt in $(seq 1 10); do
             if curl -sf "http://$EC2_HOST:8000/v1/health" > /dev/null; then
